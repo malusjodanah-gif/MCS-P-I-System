@@ -10,6 +10,8 @@
 - Reverse Issue/Adjustment cancellations exactly under locks, rejecting invalid reversals.
 - Guard Item/ItemBranch deletion and roll back failed deletion without erasing stock.
 - Enforce asset category and matching ItemBranch, derive UOM and protect system-managed stock.
+- Add receipt editing and guarded cancellation with valuation snapshots and stock revision tracking.
+- Add protected Pending GE editing, stock-safe Issue/Adjustment editing and branch selectors.
 - Add specification regression tests and SQLite/PostgreSQL GitHub Actions checks.
 - Update both READMEs and add `docs/SPECIFICATION_REVIEW.md` with remaining requirements.
 

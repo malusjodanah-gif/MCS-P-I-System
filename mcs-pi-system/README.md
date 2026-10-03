@@ -54,7 +54,7 @@ HoS is an informational branch field, never an authorization role.
 GE status is changed manually by Purchasing Officer or Administrator:
 Pending → Approved/Rejected/Cancelled; Approved → Ordered; Ordered → Received;
 Received → Backorder/Complete; Backorder → Received/Complete.
-Cancellation is allowed only before receipts. Receiving stock updates quantity and weighted
+Order cancellation is allowed only without receipts. Complete may be manually returned to Received for a receipt correction. Receiving stock updates quantity and weighted
 average cost; it does not change GE status. Complete requires full receipt, while Backorder
 requires a partial receipt. A PO number is allocated when Approved progresses to Ordered.
 
@@ -77,7 +77,11 @@ following variables at an EMPTY dedicated test database (never your operational 
 DB_CONNECTION=pgsql DB_DATABASE=mcs_pi_test DB_HOST=127.0.0.1 DB_PORT=5432 DB_USERNAME=postgres DB_PASSWORD=testing php artisan test
 ```
 
-CI repeats the full suite on both database engines. Regression tests cover composite stock
+CI repeats the full suite on both database engines. Receipts can be edited and cancelled. STOCK quantity corrections require unchanged inventory
+and a valuation snapshot; legacy or subsequently used stock is protected. Metadata corrections
+remain available. Issue/Adjustment edits reconcile old and new stock in one transaction.
+
+Regression tests cover composite stock
 keys, migrations/seeding, real login with database sessions, roles, receipt quantities and
 costing, manual statuses, cancellation, multi-line GE consistency and operational references.
 

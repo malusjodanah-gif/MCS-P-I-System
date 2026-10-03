@@ -66,39 +66,83 @@ class OrderController extends Controller
         $unit = (float) $data['unit_cost'];
 
         DB::transaction(function () use ($ge, $data, $itemId, $desc, $uom, $qty, $unit) {
-        // Serialize concurrent additions to a pre-allocated GE on PostgreSQL.
-        if (DB::connection()->getDriverName() === 'pgsql') {
-            DB::select('SELECT pg_advisory_xact_lock(?)', [(int) $ge]);
-        }
-        $lines = Order::where('ge_number', $ge)->lockForUpdate()->get();
-        $header = $lines->first();
-        if ($header && ($lines->contains(fn ($line) => $line->status !== 'Pending')
-            || $header->supplier_id != $data['supplier_id']
-            || $header->inventory_flag !== $data['inventory_flag']
-            || $header->branch_id != Auth::user()->branch_id
-            || $header->account_code !== ($data['account_code'] ?? null))) {
-            throw ValidationException::withMessages(['ge_number' => 'Add lines only to a Pending GE with the same supplier, flag, branch and account code.']);
-        }
-        Order::create([
-            'ge_number' => $ge,
-            'inventory_flag' => $data['inventory_flag'],
-            'po_number' => null,
-            'supplier_id' => $data['supplier_id'],
-            'order_date' => $header ? $header->order_date : now()->toDateString(),
-            'user_id' => Auth::user()->user_id,
-            'branch_id' => Auth::user()->branch_id ?? 201,
-            'account_code' => $data['account_code'] ?? null,
-            'item_id' => $itemId,
-            'item' => $desc,
-            'uom' => $uom,
-            'quantity' => $qty,
-            'unit_cost' => $unit,
-            'total_cost' => round($qty * $unit, 2),
-            'status' => 'Pending',
-        ]);
+            // Serialize concurrent additions to a pre-allocated GE on PostgreSQL.
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('SELECT pg_advisory_xact_lock(?)', [(int) $ge]);
+            }
+            $lines = Order::where('ge_number', $ge)->lockForUpdate()->get();
+            $header = $lines->first();
+            if ($header && ($lines->contains(fn ($line) => $line->status !== 'Pending')
+                || $header->supplier_id != $data['supplier_id']
+                || $header->inventory_flag !== $data['inventory_flag']
+                || $header->branch_id != Auth::user()->branch_id
+                || $header->account_code !== ($data['account_code'] ?? null))) {
+                throw ValidationException::withMessages(['ge_number' => 'Add lines only to a Pending GE with the same supplier, flag, branch and account code.']);
+            }
+            Order::create([
+                'ge_number' => $ge,
+                'inventory_flag' => $data['inventory_flag'],
+                'po_number' => null,
+                'supplier_id' => $data['supplier_id'],
+                'order_date' => $header ? $header->order_date : now()->toDateString(),
+                'user_id' => Auth::user()->user_id,
+                'branch_id' => Auth::user()->branch_id ?? 201,
+                'account_code' => $data['account_code'] ?? null,
+                'item_id' => $itemId,
+                'item' => $desc,
+                'uom' => $uom,
+                'quantity' => $qty,
+                'unit_cost' => $unit,
+                'total_cost' => round($qty * $unit, 2),
+                'status' => 'Pending',
+            ]);
         });
 
         return redirect()->route('orders.index')->with('success', "GE #{$ge} created (Pending). Status is updated manually by Purchasing.");
+    }
+
+    public function edit(Order $order)
+    {
+        if ($order->status !== 'Pending' || $order->receipts()->exists()) {
+            throw ValidationException::withMessages(['order' => 'Only unreceipted Pending lines can be edited.']);
+        }
+        return view('orders.create', [
+            'row' => $order, 'nextGe' => $order->ge_number,
+            'suppliers' => Supplier::orderBy('supplier')->get(),
+            'items' => Item::orderBy('item')->get(),
+        ]);
+    }
+
+    public function update(Request $request, Order $order)
+    {
+        $data = $request->validate([
+            'item_id' => 'nullable|exists:items,item_id',
+            'item' => 'nullable|string|max:255',
+            'quantity' => 'required|integer|min:1',
+            'unit_cost' => 'required|numeric|min:0',
+        ]);
+        DB::transaction(function () use ($order, $data) {
+            $order = Order::whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            if ($order->status !== 'Pending' || $order->receipts()->exists()) {
+                throw ValidationException::withMessages(['order' => 'Only unreceipted Pending lines can be edited.']);
+            }
+            if ($order->inventory_flag === 'STOCK') {
+                if (empty($data['item_id'])) {
+                    throw ValidationException::withMessages(['item_id' => 'Select a stock item.']);
+                }
+                $item = Item::findOrFail($data['item_id']);
+                $data['item'] = $item->item;
+                $data['uom'] = $item->uom;
+            } else {
+                if (empty($data['item'])) {
+                    throw ValidationException::withMessages(['item' => 'Enter the service or non-stock description.']);
+                }
+                $data['item_id'] = null;
+            }
+            $data['total_cost'] = round($data['quantity'] * (float) $data['unit_cost'], 2);
+            $order->update($data);
+        });
+        return redirect()->route('orders.index')->with('success', 'GE line updated.');
     }
 
     public function updateStatus(Request $request, Order $order)
@@ -118,8 +162,9 @@ class OrderController extends Controller
                     'Pending' => ['Approved', 'Rejected', 'Cancelled'],
                     'Approved' => ['Ordered', 'Cancelled'],
                     'Ordered' => ['Received', 'Cancelled'],
-                    'Received' => ['Backorder', 'Complete'],
+                    'Received' => ['Backorder', 'Complete', 'Cancelled'],
                     'Backorder' => ['Received', 'Complete', 'Cancelled'],
+                    'Complete' => ['Received'],
                     default => [],
                 };
                 if ($data['status'] !== $line->status && !in_array($data['status'], $allowed, true)) {

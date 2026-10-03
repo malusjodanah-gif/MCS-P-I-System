@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Support\IdGenerator;
 use App\Models\Customer;
+use App\Models\Branch;
 use App\Models\Item;
 use App\Models\ItemBranch;
 use App\Models\Issue;
@@ -26,7 +27,8 @@ class IssueController extends Controller
         $customers = Customer::orderBy('customer')->get();
         $stock = ItemBranch::where('branch_id', 201)->get()->keyBy('item_id');
         $nextId = IdGenerator::next('issues', 'issue_number', 7001, 7999);
-        return view('issues.form', compact('items', 'customers', 'stock', 'nextId'));
+        $branches = Branch::orderBy('branch_id')->get();
+        return view('issues.form', compact('items', 'customers', 'stock', 'nextId', 'branches'));
     }
 
     public function store(Request $request)
@@ -89,5 +91,50 @@ class IssueController extends Controller
             $issue->delete();
         });
         return redirect()->route('issues.index')->with('success', 'Issue cancelled and stock restored.');
+    }
+
+    public function edit(Issue $issue)
+    {
+        return view('issues.form', [
+            'row' => $issue, 'nextId' => $issue->issue_number,
+            'items' => Item::orderBy('item')->get(),
+            'customers' => Customer::orderBy('customer')->get(),
+            'branches' => Branch::orderBy('branch_id')->get(),
+        ]);
+    }
+
+    public function update(Request $request, Issue $issue)
+    {
+        $data = $request->validate([
+            'item_id' => 'required|exists:items,item_id',
+            'branch_id' => 'required|exists:branches,branch_id',
+            'quantity' => 'required|integer|min:1',
+            'customer_id' => 'required|exists:customers,customer_id',
+            'purpose' => 'nullable|string|max:500',
+        ]);
+        DB::transaction(function () use ($issue, $data) {
+            $issue = Issue::whereKey($issue->getKey())->lockForUpdate()->firstOrFail();
+            $rows = ItemBranch::where(function ($query) use ($issue, $data) {
+                $query->where(fn ($q) => $q->where('item_id', $issue->item_id)->where('branch_id', $issue->branch_id))
+                    ->orWhere(fn ($q) => $q->where('item_id', $data['item_id'])->where('branch_id', $data['branch_id']));
+            })->orderBy('item_id')->orderBy('branch_id')->lockForUpdate()->get();
+            $old = $rows->first(fn ($r) => $r->item_id == $issue->item_id && $r->branch_id == $issue->branch_id);
+            $new = $rows->first(fn ($r) => $r->item_id == $data['item_id'] && $r->branch_id == $data['branch_id']);
+            if (!$old || !$new) {
+                throw ValidationException::withMessages(['item_id' => 'Both the original and selected Item Branch must exist.']);
+            }
+            $old->current_stock += $issue->quantity;
+            if ($new->current_stock < $data['quantity']) {
+                throw ValidationException::withMessages(['quantity' => 'Insufficient stock for the revised issue.']);
+            }
+            $new->current_stock -= $data['quantity'];
+            $old->save();
+            if ($new !== $old) {
+                $new->save();
+            }
+            $data['uom'] = $new->uom;
+            $issue->update($data);
+        });
+        return redirect()->route('issues.index')->with('success', 'Issue updated and stock reconciled.');
     }
 }

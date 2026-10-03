@@ -27,6 +27,7 @@
                     <td>{{ $r->user->name ?? $r->user_id }}</td>
                     @if(auth()->user()->canWriteInventory())
                     <td class="actions-cell">
+                        <a href="{{ route('adjustments.edit', $r) }}" class="btn btn-sm btn-secondary">Edit</a>
                         <form method="POST" action="{{ route('adjustments.destroy', $r) }}" onsubmit="return confirm('Cancel this adjustment and reverse stock?')">
                             @csrf @method('DELETE')
                             <button type="submit" class="btn btn-sm btn-danger">Cancel</button>

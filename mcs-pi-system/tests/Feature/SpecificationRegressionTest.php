@@ -6,6 +6,7 @@ use App\Models\Adjustment;
 use App\Models\Branch;
 use App\Models\ItemBranch;
 use App\Models\Order;
+use App\Models\Receipt;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -278,5 +279,169 @@ class SpecificationRegressionTest extends TestCase
         $row->save();
         $this->actingAs(User::findOrFail('eu1'))->get('/reports/reorder')->assertOk()
             ->assertViewHas('rows', fn ($rows) => $rows->contains(fn ($record) => $record->item_id == 1001));
+    }
+
+    public function test_pending_ge_line_can_be_edited_without_changing_its_header(): void
+    {
+        $order = $this->order();
+        $order->update(['status' => 'Pending', 'po_number' => null]);
+        $this->actingAs(User::findOrFail('po1'))->get(route('orders.edit', $order))->assertOk();
+        $this->put(route('orders.update', $order), [
+            'item_id' => 1002, 'quantity' => 3, 'unit_cost' => 12.5,
+            'supplier_id' => 5003, 'ge_number' => 9999,
+        ])->assertSessionHasNoErrors();
+        $after = $order->fresh();
+        $this->assertSame(9001, (int) $after->ge_number);
+        $this->assertSame(5001, (int) $after->supplier_id);
+        $this->assertSame(1002, (int) $after->item_id);
+        $this->assertSame('37.50', $after->total_cost);
+        $this->assertSame($after->stockItem->item, $after->item);
+        $this->patch(route('orders.status', $order), ['status' => 'Approved'])->assertSessionHasNoErrors();
+        $this->put(route('orders.update', $order), ['item_id' => 1001, 'quantity' => 1, 'unit_cost' => 1])
+            ->assertSessionHasErrors('order');
+        $this->assertSame(3, (int) $order->fresh()->quantity);
+    }
+
+    public function test_issue_edit_reconciles_the_old_and_new_quantities(): void
+    {
+        $before = $this->stock()->current_stock;
+        $this->actingAs(User::findOrFail('po1'))->post('/issues', [
+            'issue_number' => 7998, 'item_id' => 1001, 'quantity' => 2, 'customer_id' => 4001,
+        ])->assertSessionHasNoErrors();
+        $this->get('/issues/7998/edit')->assertOk()->assertSee('Branch');
+        $this->put('/issues/7998', ['item_id' => 1001, 'branch_id' => 201,
+            'quantity' => 5, 'customer_id' => 4001, 'purpose' => 'Revised'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame($before - 5, $this->stock()->current_stock);
+        $this->put('/issues/7998', ['item_id' => 1001, 'branch_id' => 201,
+            'quantity' => $before + 1, 'customer_id' => 4001])->assertSessionHasErrors('quantity');
+        $this->assertSame($before - 5, $this->stock()->current_stock);
+        $this->assertDatabaseHas('issues', ['issue_number' => 7998, 'quantity' => 5]);
+    }
+
+    public function test_issue_edit_can_move_to_another_branch_atomically(): void
+    {
+        Branch::create(['branch_id' => 202, 'branch' => 'Other', 'faculty' => 'Sciences']);
+        ItemBranch::create(['item_id' => 1001, 'branch_id' => 202, 'uom' => 'REAM',
+            'current_stock' => 7, 'unit_cost' => 20, 'location' => 'Store B',
+            'reorder_level' => 0, 'reorder_quantity' => 0]);
+        $before = $this->stock()->current_stock;
+        $this->actingAs(User::findOrFail('io1'))->post('/issues', [
+            'issue_number' => 7998, 'item_id' => 1001, 'quantity' => 2, 'customer_id' => 4001,
+        ])->assertSessionHasNoErrors();
+        $this->put('/issues/7998', ['item_id' => 1001, 'branch_id' => 202,
+            'quantity' => 3, 'customer_id' => 4001])->assertSessionHasNoErrors();
+        $this->assertSame($before, $this->stock()->current_stock);
+        $this->assertSame(4, $this->stock(1001, 202)->current_stock);
+        $this->assertDatabaseHas('issues', ['issue_number' => 7998, 'branch_id' => 202, 'quantity' => 3]);
+    }
+
+    public function test_adjustment_edit_applies_only_the_net_stock_change(): void
+    {
+        $before = $this->stock(1006)->current_stock;
+        $this->actingAs(User::findOrFail('io1'))->get('/adjustments/5101/edit')->assertOk()->assertSee('Branch');
+        $this->put('/adjustments/5101', ['item_id' => 1006, 'branch_id' => 201,
+            'quantity' => 5, 'adjustment_type' => 'IN'])->assertSessionHasNoErrors();
+        $this->assertSame($before + 2, $this->stock(1006)->current_stock);
+        $this->put('/adjustments/5101', ['item_id' => 1006, 'branch_id' => 201,
+            'quantity' => 2, 'adjustment_type' => 'OUT'])->assertSessionHasNoErrors();
+        $this->assertSame(10, $this->stock(1006)->current_stock);
+        $this->put('/adjustments/5101', ['item_id' => 1006, 'branch_id' => 201,
+            'quantity' => 100, 'adjustment_type' => 'OUT'])->assertSessionHasErrors('quantity');
+        $this->assertSame(10, $this->stock(1006)->current_stock);
+        $this->assertDatabaseHas('adjustments', ['adjustment_number' => 5101, 'quantity' => 2, 'adjustment_type' => 'OUT']);
+    }
+
+    public function test_transaction_create_and_edit_forms_obey_role_permissions(): void
+    {
+        $this->actingAs(User::findOrFail('po1'))->get('/issues/create')->assertOk()->assertSee('Branch');
+        $this->get('/adjustments/create')->assertOk()->assertSee('Branch');
+        $this->get('/orders/create')->assertOk();
+        $this->actingAs(User::findOrFail('eu1'))->get('/issues/7001/edit')->assertForbidden();
+        $this->put('/issues/7001', [])->assertForbidden();
+        $this->get('/adjustments/5101/edit')->assertForbidden();
+        $this->put('/adjustments/5101', [])->assertForbidden();
+    }
+
+    public function test_stock_receipt_edit_recalculates_cost_and_cancel_restores_the_snapshot(): void
+    {
+        $order = $this->order();
+        $before = $this->stock();
+        $quantity = $before->current_stock;
+        $cost = (float) $before->unit_cost;
+        $this->receipt($order, 4)->assertSessionHasNoErrors();
+        $receipt = $order->receipts()->firstOrFail();
+        $this->get(route('receipts.edit', $receipt))->assertOk();
+        $this->put(route('receipts.update', $receipt), ['quantity_received' => 6,
+            'received_by' => 'Corrected', 'date_received' => now()->toDateString(), 'grn' => 'CORRECTED'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame($quantity + 6, $this->stock()->current_stock);
+        $this->assertEqualsWithDelta(round(($quantity * $cost + 6 * 30) / ($quantity + 6), 4),
+            (float) $this->stock()->unit_cost, 0.0001);
+        $this->delete(route('receipts.destroy', $receipt))->assertSessionHasNoErrors();
+        $this->assertSame($quantity, $this->stock()->current_stock);
+        $this->assertEqualsWithDelta($cost, (float) $this->stock()->unit_cost, 0.0001);
+        $this->assertDatabaseMissing('receipts', ['receipt_id' => $receipt->getKey()]);
+        $this->assertSame('Ordered', $order->fresh()->status);
+    }
+
+    public function test_receipt_stock_changes_are_blocked_after_issue_but_metadata_can_be_edited(): void
+    {
+        $order = $this->order();
+        $this->receipt($order, 4)->assertSessionHasNoErrors();
+        $receipt = $order->receipts()->firstOrFail();
+        $this->post('/issues', ['item_id' => 1001, 'quantity' => 1, 'customer_id' => 4001])
+            ->assertSessionHasNoErrors();
+        $before = $this->stock()->current_stock;
+        $this->delete(route('receipts.destroy', $receipt))->assertSessionHasErrors('quantity_received');
+        $this->put(route('receipts.update', $receipt), ['quantity_received' => 5,
+            'received_by' => 'Test', 'date_received' => now()->toDateString()])->assertSessionHasErrors('quantity_received');
+        $this->assertSame($before, $this->stock()->current_stock);
+        $this->put(route('receipts.update', $receipt), ['quantity_received' => 4,
+            'received_by' => 'Metadata corrected', 'date_received' => now()->toDateString(), 'grn' => 'INV-C'])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('INV-C', $receipt->fresh()->grn);
+        $this->assertSame($before, $this->stock()->current_stock);
+    }
+
+    public function test_nonstock_receipt_can_be_edited_and_cancelled_without_stock_changes(): void
+    {
+        $order = $this->order('NON-STOCK', 3);
+        $before = $this->stock()->current_stock;
+        $this->receipt($order, 1)->assertSessionHasNoErrors();
+        $receipt = $order->receipts()->firstOrFail();
+        $this->put(route('receipts.update', $receipt), ['quantity_received' => 3,
+            'received_by' => 'Test', 'date_received' => now()->toDateString()])->assertSessionHasNoErrors();
+        $this->put(route('receipts.update', $receipt), ['quantity_received' => 4,
+            'received_by' => 'Test', 'date_received' => now()->toDateString()])->assertSessionHasErrors('quantity_received');
+        $this->delete(route('receipts.destroy', $receipt))->assertSessionHasNoErrors();
+        $this->assertSame($before, $this->stock()->current_stock);
+        $this->assertSame(0, $order->receipts()->count());
+    }
+
+    public function test_legacy_receipt_cannot_be_reversed_without_a_valuation_snapshot(): void
+    {
+        $order = $this->order();
+        $this->receipt($order, 1)->assertSessionHasNoErrors();
+        $receipt = $order->receipts()->firstOrFail();
+        $receipt->forceFill(['stock_before' => null, 'stock_revision_after' => null])->save();
+        $before = $this->stock()->current_stock;
+        $this->delete(route('receipts.destroy', $receipt))->assertSessionHasErrors('quantity_received');
+        $this->assertSame($before, $this->stock()->current_stock);
+        $this->assertDatabaseHas('receipts', ['receipt_id' => $receipt->getKey()]);
+    }
+
+    public function test_completed_receipt_requires_manual_status_correction_before_cancellation(): void
+    {
+        $order = $this->order('NON-STOCK', 1);
+        $this->receipt($order, 1)->assertSessionHasNoErrors();
+        $receipt = $order->receipts()->firstOrFail();
+        $this->patch(route('orders.status', $order), ['status' => 'Received'])->assertSessionHasNoErrors();
+        $this->patch(route('orders.status', $order), ['status' => 'Complete'])->assertSessionHasNoErrors();
+        $this->delete(route('receipts.destroy', $receipt))->assertSessionHasErrors('quantity_received');
+        $this->patch(route('orders.status', $order), ['status' => 'Received'])->assertSessionHasNoErrors();
+        $this->delete(route('receipts.destroy', $receipt))->assertSessionHasNoErrors();
+        $this->patch(route('orders.status', $order), ['status' => 'Cancelled'])->assertSessionHasNoErrors();
+        $this->assertSame('Cancelled', $order->fresh()->status);
     }
 }

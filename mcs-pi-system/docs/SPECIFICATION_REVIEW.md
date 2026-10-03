@@ -30,36 +30,39 @@ The repository PDF retains the same governing business rules as the v4 report co
 | Stock metadata | UOM and initial stock could be forged through forms | Copy UOM from Item; start new Item Branch records at zero and use movements for stock. |
 | Documentation | README said Laravel 11/12 and PHP 8.2 | Match composer.json and composer.lock: Laravel 13 and PHP 8.3+. |
 
-## What remains incomplete
+## Compatibility and acceptance limits
 
-These are source-confirmed gaps, not completed features:
-
-1. GE line editing is absent: there is creation, status update and deletion, but no edit/update form.
-2. Receipt editing, cancellation and deletion are absent. Reversing receipts must handle both
-   quantity and weighted-average valuation, including later movements; a simple subtraction
-   is insufficient. Legacy receipts have no stored valuation snapshot or inventory ledger.
-3. Issue and Adjustment editing is absent; cancellation currently deletes the transaction.
-   A durable cancellation/audit history would improve traceability but is an additional design choice.
-4. Forms for Issues and Adjustments do not select a branch; normal UI transactions default to 201.
-   The backend validates a supplied branch, but broader branch operation needs UI work.
-5. Asset registration validates stock membership but does not implement an explicit stock-to-asset
-   reclassification movement. Agree and test that accounting behavior before calling it complete.
-6. GE header/line and receipt ID schemas use surrogate IDs instead of the specification's stated
-   GE/PO primary keys. This supports many lines and partial receipts, but must be explained in
-   the ERD and reports. A normalized header/line model remains a useful follow-up.
-7. ID allocation uses `max + 1`. Concurrent new transactions can collide on IDs; database uniqueness
-   protects records, but friendly retry/sequence handling has not been implemented.
-8. Branch/user administration is Administrator-only as the reports describe. The v4 prose gives
-   broad staff access to tables, so the reports should explicitly retain this narrower policy.
-9. Existing records with mixed GE headers, STOCK orders with null items, or legacy asset links need
-   data review. This change does not rewrite operational records or reseed existing databases.
+- Pending GE line editing and Issue/Adjustment editing are now implemented. Inventory edits
+  reconcile old and new quantities in one transaction; forms select the relevant branch.
+- Receipt editing and cancellation are implemented. New STOCK receipts retain quantity/cost
+  snapshots and an inventory revision. Reversal restores the exact pre-receipt valuation and is
+  rejected after later stock/cost changes. Metadata can still be corrected. NON-STOCK receipts
+  can be edited/reversed without affecting inventory. Completed orders must be manually moved
+  to Received before quantity correction; GE statuses never change automatically.
+- Legacy STOCK receipts lack valuation snapshots and cannot be reversed safely by this change.
+  Receipts affected by later movements require a reviewed correction/adjustment workflow.
+  Arbitrary retroactive valuation replay is not implemented.
+- Asset registration validates ASSET category and ItemBranch membership. The specification
+  lists receipts, issues and adjustments as stock-changing operations; it does not define an
+  automatic asset-registration quantity deduction. Agree the physical reclassification process
+  before adding any additional automatic stock movement.
+- GE header/line and receipt schemas use surrogate IDs instead of the specification's stated
+  GE/PO primary keys. This supports many lines and partial receipts; explain it in the ERD.
+- ID allocation uses `max + 1`. Concurrent new transactions can collide on IDs; uniqueness
+  protects records, but friendly retry/sequence handling remains additional hardening work.
+- Branch/user administration is Administrator-only as the reports describe. The v4 prose gives
+  broad staff access, so document this narrower administration policy explicitly.
+- Existing records with mixed GE headers, STOCK orders with null items, or invalid asset links
+  need data review. These changes do not rewrite operational records or reseed existing databases.
+- Acceptance testing against the user's existing database and browser environment has not been
+  performed. Automated tests use isolated fixtures, not live school records.
 
 ## Report corrections to make before submission
 
 Treat the reports as dated development records. Do not change their original submission dates or
 replace historical progress with unverified current claims. Add a dated verification addendum:
 
-- Distinguish Create/View/Cancel/Delete from full CRUD where Edit is absent.
+- GE, Issue and Adjustment editing has now been added; distinguish these from Receipt CRUD, whose reversals are guarded by valuation snapshots and subsequent stock movements.
 - State that GE status is manual even after a receipt; Purchasing manually chooses Received,
   Backorder or Complete when the receipt totals permit it.
 - Document PO inventory access as full access, and restrict user/branch administration explicitly.
@@ -68,7 +71,7 @@ replace historical progress with unverified current claims. Add a dated verifica
 - Show reports as application outputs returned to the browser, not a downstream database server.
   The architecture report's client/server and TPS explanation remains appropriate; its table of
   contents also needs regeneration because the References page number exceeds its actual pages.
-- Include the remaining receipt and asset workflow gaps, updated ERD, test counts and actual test
+- Include receipt reversal limits and the agreed asset workflow, updated ERD, test counts and actual test
   results. The existing reports correctly say further testing is required.
 
 ## Verification status
@@ -76,8 +79,8 @@ replace historical progress with unverified current claims. Add a dated verifica
 Local source review completed; JSON and workflow YAML parse checks and `git diff --check` passed.
 PHP/Composer are not available in this execution environment, and the PHP installer host was
 unreachable. Local Laravel/PHPUnit execution has therefore not occurred.
-GitHub Actions configuration runs syntax checks, routes, Blade compilation and the full suite on
-SQLite and PostgreSQL 16 with PHP 8.5. Check the PR's actual runs before claiming tests passed.
+The first GitHub Actions run passed PHP syntax, route and Blade checks and 32 tests / 146 assertions on SQLite and PostgreSQL 16 (PHP 8.5), commit `50563631da1654508ddb414fbe3c57e4d8f604e7`.
+Additional transaction editing, branch selection and receipt reversal coverage is being validated in the updated PR.
 Passing these regression tests will not replace user acceptance checks for the open requirements.
 
 ## Demonstration and acceptance checklist
@@ -100,5 +103,4 @@ Use an isolated demonstration/test database, never reset the operational databas
 11. Register an ASSET item at a valid Item Branch; reject a consumable or missing branch relation.
 12. Check stock, purchases, issues and reorder reports against database quantities, including stock
     exactly equal to the reorder level.
-13. Complete and separately test the missing edit, receipt reversal and asset reclassification
-    requirements before final handover.
+13. Demonstrate receipt edit/cancellation with unchanged stock, and verify rejection after later stock use. Agree asset reclassification and review legacy records before final handover.

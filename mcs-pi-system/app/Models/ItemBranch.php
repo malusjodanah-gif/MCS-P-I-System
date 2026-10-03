@@ -11,6 +11,15 @@ class ItemBranch extends Model
     protected $primaryKey = 'item_id';
     protected $keyType = 'int';
 
+    protected static function booted(): void
+    {
+        static::saving(function (ItemBranch $row) {
+            if ($row->exists && $row->isDirty(['current_stock', 'unit_cost'])) {
+                $row->stock_revision = ((int) $row->getRawOriginal('stock_revision')) + 1;
+            }
+        });
+    }
+
     // Eloquent assumes one primary key. Scope every write by both columns.
     protected function setKeysForSaveQuery($query)
     {
