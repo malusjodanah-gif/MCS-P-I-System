@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
@@ -67,7 +69,11 @@ class UserController extends Controller
         if ($user->user_id === Auth::user()->user_id) {
             return back()->withErrors(['delete' => 'You cannot delete your own account.']);
         }
-        $user->delete();
+        try {
+            DB::transaction(fn () => $user->delete());
+        } catch (QueryException $e) {
+            return back()->withErrors(['delete' => 'Cannot delete: this user is referenced by purchasing or inventory records.']);
+        }
         return redirect()->route('users.index')->with('success', 'User deleted.');
     }
 }

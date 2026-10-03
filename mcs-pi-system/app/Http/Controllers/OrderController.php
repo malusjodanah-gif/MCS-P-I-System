@@ -8,6 +8,7 @@ use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
@@ -32,7 +33,7 @@ class OrderController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'ge_number' => 'nullable|integer',
+            'ge_number' => 'nullable|integer|min:1|max:2147483647',
             'inventory_flag' => 'required|in:STOCK,NON-STOCK',
             'supplier_id' => 'required|exists:suppliers,supplier_id',
             'account_code' => 'nullable|string|max:50',
@@ -42,7 +43,7 @@ class OrderController extends Controller
             'unit_cost' => 'required|numeric|min:0',
         ]);
 
-        $ge = $data['ge_number'] ?? ((Order::max('ge_number') ?? 1000) + 1);
+        $requestedGe = $data['ge_number'] ?? null;
         $desc = $data['item'] ?? null;
         $uom = null;
         $itemId = $data['item_id'] ?? null;
@@ -52,7 +53,7 @@ class OrderController extends Controller
                 return back()->withErrors(['item_id' => 'Item is required for STOCK orders'])->withInput();
             }
             $item = Item::findOrFail($itemId);
-            $desc = $desc ?: $item->item;
+            $desc = $item->item;
             $uom = $item->uom;
         } else {
             $itemId = null;
@@ -64,25 +65,89 @@ class OrderController extends Controller
         $qty = (int) $data['quantity'];
         $unit = (float) $data['unit_cost'];
 
-        Order::create([
-            'ge_number' => $ge,
-            'inventory_flag' => $data['inventory_flag'],
-            'po_number' => $ge,
-            'supplier_id' => $data['supplier_id'],
-            'order_date' => now()->toDateString(),
-            'user_id' => Auth::user()->user_id,
-            'branch_id' => Auth::user()->branch_id ?? 201,
-            'account_code' => $data['account_code'] ?? null,
-            'item_id' => $itemId,
-            'item' => $desc,
-            'uom' => $uom,
-            'quantity' => $qty,
-            'unit_cost' => $unit,
-            'total_cost' => round($qty * $unit, 2),
-            'status' => 'Pending',
-        ]);
+        $ge = DB::transaction(function () use ($requestedGe, $data, $itemId, $desc, $uom, $qty, $unit) {
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['mcs-ge-allocation']);
+            }
+            $ge = $requestedGe ?? ((Order::max('ge_number') ?? 1000) + 1);
+            // Serialize concurrent additions to a pre-allocated GE on PostgreSQL.
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('SELECT pg_advisory_xact_lock(?)', [(int) $ge]);
+            }
+            $lines = Order::where('ge_number', $ge)->lockForUpdate()->get();
+            $header = $lines->first();
+            if ($header && ($lines->contains(fn ($line) => $line->status !== 'Pending')
+                || $header->supplier_id != $data['supplier_id']
+                || $header->inventory_flag !== $data['inventory_flag']
+                || $header->branch_id != Auth::user()->branch_id
+                || $header->account_code !== ($data['account_code'] ?? null))) {
+                throw ValidationException::withMessages(['ge_number' => 'Add lines only to a Pending GE with the same supplier, flag, branch and account code.']);
+            }
+            Order::create([
+                'ge_number' => $ge,
+                'inventory_flag' => $data['inventory_flag'],
+                'po_number' => null,
+                'supplier_id' => $data['supplier_id'],
+                'order_date' => $header ? $header->order_date : now()->toDateString(),
+                'user_id' => Auth::user()->user_id,
+                'branch_id' => Auth::user()->branch_id ?? 201,
+                'account_code' => $data['account_code'] ?? null,
+                'item_id' => $itemId,
+                'item' => $desc,
+                'uom' => $uom,
+                'quantity' => $qty,
+                'unit_cost' => $unit,
+                'total_cost' => round($qty * $unit, 2),
+                'status' => 'Pending',
+            ]);
+            return $ge;
+        }, 5);
 
         return redirect()->route('orders.index')->with('success', "GE #{$ge} created (Pending). Status is updated manually by Purchasing.");
+    }
+
+    public function edit(Order $order)
+    {
+        if ($order->status !== 'Pending' || $order->receipts()->exists()) {
+            throw ValidationException::withMessages(['order' => 'Only unreceipted Pending lines can be edited.']);
+        }
+        return view('orders.create', [
+            'row' => $order, 'nextGe' => $order->ge_number,
+            'suppliers' => Supplier::orderBy('supplier')->get(),
+            'items' => Item::orderBy('item')->get(),
+        ]);
+    }
+
+    public function update(Request $request, Order $order)
+    {
+        $data = $request->validate([
+            'item_id' => 'nullable|exists:items,item_id',
+            'item' => 'nullable|string|max:255',
+            'quantity' => 'required|integer|min:1',
+            'unit_cost' => 'required|numeric|min:0',
+        ]);
+        DB::transaction(function () use ($order, $data) {
+            $order = Order::whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            if ($order->status !== 'Pending' || $order->receipts()->exists()) {
+                throw ValidationException::withMessages(['order' => 'Only unreceipted Pending lines can be edited.']);
+            }
+            if ($order->inventory_flag === 'STOCK') {
+                if (empty($data['item_id'])) {
+                    throw ValidationException::withMessages(['item_id' => 'Select a stock item.']);
+                }
+                $item = Item::findOrFail($data['item_id']);
+                $data['item'] = $item->item;
+                $data['uom'] = $item->uom;
+            } else {
+                if (empty($data['item'])) {
+                    throw ValidationException::withMessages(['item' => 'Enter the service or non-stock description.']);
+                }
+                $data['item_id'] = null;
+            }
+            $data['total_cost'] = round($data['quantity'] * (float) $data['unit_cost'], 2);
+            $order->update($data);
+        });
+        return redirect()->route('orders.index')->with('success', 'GE line updated.');
     }
 
     public function updateStatus(Request $request, Order $order)
@@ -92,21 +157,62 @@ class OrderController extends Controller
             'update_whole_ge' => 'nullable|boolean',
         ]);
 
-        if ($request->boolean('update_whole_ge')) {
-            Order::where('ge_number', $order->ge_number)->update(['status' => $data['status']]);
-        } else {
-            $order->update(['status' => $data['status']]);
-        }
+        DB::transaction(function () use ($request, $order, $data) {
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('SELECT pg_advisory_xact_lock(?)', [(int) $order->ge_number]);
+            }
+            $query = Order::query();
+            $lines = ($request->boolean('update_whole_ge')
+                ? $query->where('ge_number', $order->ge_number)
+                : $query->whereKey($order->getKey()))->orderBy('order_line_id')->lockForUpdate()->get();
+            foreach ($lines as $line) {
+                $allowed = match ($line->status) {
+                    'Pending' => ['Approved', 'Rejected', 'Cancelled'],
+                    'Approved' => ['Ordered', 'Cancelled'],
+                    'Ordered' => ['Received', 'Cancelled'],
+                    'Received' => ['Backorder', 'Complete', 'Cancelled'],
+                    'Backorder' => ['Received', 'Complete', 'Cancelled'],
+                    'Complete' => ['Received'],
+                    default => [],
+                };
+                if ($data['status'] !== $line->status && !in_array($data['status'], $allowed, true)) {
+                    throw ValidationException::withMessages(['status' => "Cannot change {$line->status} to {$data['status']}."]);
+                }
+                $received = (int) $line->receipts()->sum('quantity_received');
+                if ($data['status'] === 'Complete' && $received !== $line->quantity) {
+                    throw ValidationException::withMessages(['status' => 'Receive the full ordered quantity before marking Complete.']);
+                }
+                if ($data['status'] === 'Backorder' && ($received <= 0 || $received >= $line->quantity)) {
+                    throw ValidationException::withMessages(['status' => 'Backorder requires a partial receipt with quantity still outstanding.']);
+                }
+                if ($data['status'] === 'Received' && $received <= 0) {
+                    throw ValidationException::withMessages(['status' => 'Record a receipt before marking Received.']);
+                }
+                if ($data['status'] === 'Cancelled' && $received > 0) {
+                    throw ValidationException::withMessages(['status' => 'An order with receipts cannot be cancelled.']);
+                }
+            }
+            foreach ($lines as $line) {
+                $line->status = $data['status'];
+                if ($line->status === 'Ordered') {
+                    $line->po_number = $line->po_number ?? $line->ge_number;
+                }
+                $line->save();
+            }
+        });
 
         return back()->with('success', 'Status updated to ' . $data['status']);
     }
 
     public function destroy(Order $order)
     {
-        if (!in_array($order->status, ['Pending', 'Rejected', 'Cancelled'], true)) {
-            return back()->withErrors(['status' => 'Only Pending/Rejected/Cancelled lines can be deleted.']);
-        }
-        $order->delete();
+        DB::transaction(function () use ($order) {
+            $order = Order::whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            if (!in_array($order->status, ['Pending', 'Rejected', 'Cancelled'], true) || $order->receipts()->exists()) {
+                throw ValidationException::withMessages(['status' => 'Only unreceipted Pending/Rejected/Cancelled lines can be deleted.']);
+            }
+            $order->delete();
+        });
         return back()->with('success', 'Order line deleted.');
     }
 }

@@ -30,6 +30,9 @@
                     <td><span class="badge badge-{{ strtolower($r->status) }}">{{ $r->status }}</span></td>
                     <td>
                         @if(auth()->user()->canWritePurchasing())
+                        @if($r->status === 'Pending')
+                        <a href="{{ route('orders.edit', $r) }}" class="btn btn-sm btn-secondary">Edit</a>
+                        @endif
                         <form method="POST" action="{{ route('orders.status', $r) }}" style="display:inline-flex;gap:0.35rem;align-items:center">
                             @csrf @method('PATCH')
                             <select name="status" style="font-size:0.75rem;padding:0.2rem">

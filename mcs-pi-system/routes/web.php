@@ -30,6 +30,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:Purchasing Officer')->group(function () {
         Route::get('/orders/create', [OrderController::class, 'create'])->name('orders.create');
         Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');
+        Route::get('/orders/{order}/edit', [OrderController::class, 'edit'])->name('orders.edit');
+        Route::put('/orders/{order}', [OrderController::class, 'update'])->name('orders.update');
         Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
         Route::delete('/orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
 
@@ -45,6 +47,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:Purchasing Officer')->group(function () {
         Route::get('/receipts/create', [ReceiptController::class, 'create'])->name('receipts.create');
         Route::post('/receipts', [ReceiptController::class, 'store'])->name('receipts.store');
+        Route::get('/receipts/{receipt}/edit', [ReceiptController::class, 'edit'])->name('receipts.edit');
+        Route::put('/receipts/{receipt}', [ReceiptController::class, 'update'])->name('receipts.update');
+        Route::delete('/receipts/{receipt}', [ReceiptController::class, 'destroy'])->name('receipts.destroy');
     });
 
     // ----- Inventory (Admin + PO + IO) -----
@@ -85,14 +90,18 @@ Route::middleware('auth')->group(function () {
         Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
     });
 
-    // Issue (ISSUE table) & Adjustment — Inventory Officer (and Admin); PO can view only
-    Route::middleware('role:Inventory Officer')->group(function () {
+    // Specification v4 grants Purchasing Officers full inventory access.
+    Route::middleware('role:Purchasing Officer,Inventory Officer')->group(function () {
         Route::get('/issues/create', [IssueController::class, 'create'])->name('issues.create');
         Route::post('/issues', [IssueController::class, 'store'])->name('issues.store');
+        Route::get('/issues/{issue}/edit', [IssueController::class, 'edit'])->name('issues.edit');
+        Route::put('/issues/{issue}', [IssueController::class, 'update'])->name('issues.update');
         Route::delete('/issues/{issue}', [IssueController::class, 'destroy'])->name('issues.destroy');
 
         Route::get('/adjustments/create', [AdjustmentController::class, 'create'])->name('adjustments.create');
         Route::post('/adjustments', [AdjustmentController::class, 'store'])->name('adjustments.store');
+        Route::get('/adjustments/{adjustment}/edit', [AdjustmentController::class, 'edit'])->name('adjustments.edit');
+        Route::put('/adjustments/{adjustment}', [AdjustmentController::class, 'update'])->name('adjustments.update');
         Route::delete('/adjustments/{adjustment}', [AdjustmentController::class, 'destroy'])->name('adjustments.destroy');
     });
 

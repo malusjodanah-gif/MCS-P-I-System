@@ -30,6 +30,7 @@
                     <td>{{ $r->user_id }}</td>
                     @if(auth()->user()->canWriteInventory())
                     <td class="actions-cell">
+                        <a href="{{ route('issues.edit', $r) }}" class="btn btn-sm btn-secondary">Edit</a>
                         <form method="POST" action="{{ route('issues.destroy', $r) }}" onsubmit="return confirm('Cancel this Issue and restore Current Stock?')">
                             @csrf @method('DELETE')
                             <button type="submit" class="btn btn-sm btn-danger">Cancel</button>

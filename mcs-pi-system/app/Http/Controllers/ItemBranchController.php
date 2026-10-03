@@ -6,6 +6,8 @@ use App\Models\Branch;
 use App\Models\Item;
 use App\Models\ItemBranch;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ItemBranchController extends Controller
 {
@@ -27,8 +29,7 @@ class ItemBranchController extends Controller
         $data = $request->validate([
             'item_id' => 'required|exists:items,item_id',
             'branch_id' => 'required|exists:branches,branch_id',
-            'uom' => 'required|string|max:50',
-            'current_stock' => 'required|integer|min:0',
+            'current_stock' => 'nullable|integer|in:0',
             'unit_cost' => 'required|numeric|min:0',
             'location' => 'required|string|max:255',
             'reorder_level' => 'required|integer|min:0',
@@ -39,6 +40,8 @@ class ItemBranchController extends Controller
             return back()->withErrors(['item_id' => 'Stock record already exists for this item/branch.'])->withInput();
         }
 
+        $data['uom'] = Item::findOrFail($data['item_id'])->uom;
+        $data['current_stock'] = 0;
         ItemBranch::create($data);
         return redirect()->route('itembranch.index')->with('success', 'Stock location created.');
     }
@@ -57,20 +60,30 @@ class ItemBranchController extends Controller
         // Current stock is system-managed via receipts/issues/adjustments;
         // allow manual unit_cost, location, reorder fields, uom
         $data = $request->validate([
-            'uom' => 'required|string|max:50',
             'unit_cost' => 'required|numeric|min:0',
             'location' => 'required|string|max:255',
             'reorder_level' => 'required|integer|min:0',
             'reorder_quantity' => 'required|integer|min:0',
         ]);
+        $data['uom'] = $row->item->uom;
         $row->update($data);
         return redirect()->route('itembranch.index')->with('success', 'Stock record updated.');
     }
 
     public function destroy($itemId, $branchId)
     {
-        $row = ItemBranch::where('item_id', $itemId)->where('branch_id', $branchId)->firstOrFail();
-        $row->delete();
+        DB::transaction(function () use ($itemId, $branchId) {
+            $row = ItemBranch::where('item_id', $itemId)->where('branch_id', $branchId)->lockForUpdate()->firstOrFail();
+            if ($row->current_stock > 0) {
+                throw ValidationException::withMessages(['delete' => 'Cannot delete an Item Branch with stock remaining.']);
+            }
+            foreach (['assets', 'orders', 'receipts', 'issues', 'adjustments'] as $table) {
+                if (DB::table($table)->where('item_id', $itemId)->where('branch_id', $branchId)->exists()) {
+                    throw ValidationException::withMessages(['delete' => 'Cannot delete an Item Branch referenced by operational records.']);
+                }
+            }
+            $row->delete();
+        });
         return redirect()->route('itembranch.index')->with('success', 'Stock record deleted.');
     }
 }

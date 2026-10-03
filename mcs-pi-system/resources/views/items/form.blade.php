@@ -30,7 +30,7 @@
             <div class="form-group">
                 <label>Sub-Category</label>
                 <select name="sub_category">
-                    @foreach(['Stationery','Cleaning','General','Staff-use','Computer','ICT Equipment','Tools Equipment','Fixtures & Furniture'] as $s)
+                    @foreach(['Stationery','Cleaning','General','Staff','Computer','ICT Equipment','Tools Equipment','Fixtures & Furniture'] as $s)
                         <option value="{{ $s }}" @selected(old('sub_category', $row->sub_category ?? '')===$s)>{{ $s }}</option>
                     @endforeach
                 </select>
@@ -47,7 +47,8 @@
             @if(!$row)
             <div class="form-group">
                 <label>Current Stock</label>
-                <input type="number" name="current_stock" value="{{ old('current_stock', 0) }}" min="0">
+                <input type="number" value="0" disabled>
+                <small>Record stock through Receipts or Adjustments after creating the item.</small>
             </div>
             <div class="form-group">
                 <label>Unit Cost</label>

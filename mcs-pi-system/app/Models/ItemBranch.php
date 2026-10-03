@@ -8,7 +8,29 @@ class ItemBranch extends Model
 {
     protected $table = 'item_branches';
     public $incrementing = false;
-    protected $primaryKey = null;
+    protected $primaryKey = 'item_id';
+    protected $keyType = 'int';
+
+    protected static function booted(): void
+    {
+        static::saving(function (ItemBranch $row) {
+            if ($row->exists && $row->isDirty(['current_stock', 'unit_cost'])) {
+                $row->stock_revision = ((int) $row->getRawOriginal('stock_revision')) + 1;
+            }
+        });
+    }
+
+    // Eloquent assumes one primary key. Scope every write by both columns.
+    protected function setKeysForSaveQuery($query)
+    {
+        return $query->where('item_id', $this->getRawOriginal('item_id') ?? $this->item_id)
+            ->where('branch_id', $this->getRawOriginal('branch_id') ?? $this->branch_id);
+    }
+
+    protected function setKeysForSelectQuery($query)
+    {
+        return $this->setKeysForSaveQuery($query);
+    }
 
     protected $fillable = [
         'item_id', 'branch_id', 'uom', 'current_stock', 'unit_cost',

@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', $row ? 'Edit Inventory Level' : 'Add Inventory Level')
+@section('title', $row ? 'Edit Item Branch' : 'Add Item Branch')
 @section('content')
 <div class="card" style="max-width:640px">
     <form method="POST" action="{{ $row ? route('itembranch.update', [$row->item_id, $row->branch_id]) : route('itembranch.store') }}">
@@ -25,7 +25,8 @@
             </div>
             <div class="form-group">
                 <label>Current Stock</label>
-                <input type="number" name="current_stock" value="{{ old('current_stock', 0) }}" min="0" required>
+                <input type="number" value="0" disabled>
+                <small>Stock is maintained through Receipts, Issues and Adjustments.</small>
             </div>
             @else
             <div class="form-group">
@@ -43,7 +44,7 @@
             @endif
             <div class="form-group">
                 <label>UOM</label>
-                <input type="text" name="uom" value="{{ old('uom', $row->uom ?? '') }}" required>
+                <input type="text" value="{{ $row->uom ?? 'From selected item' }}" disabled>
             </div>
             <div class="form-group">
                 <label>Unit Cost</label>

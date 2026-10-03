@@ -131,6 +131,7 @@ class McsPiSystemTest extends TestCase
 
         $before = ItemBranch::where('item_id', 1001)->where('branch_id', 201)->first();
         $stockBefore = $before->current_stock;
+        $costBefore = (float) $before->unit_cost;
 
         $this->actingAs($user)
             ->post('/receipts', [
@@ -143,7 +144,9 @@ class McsPiSystemTest extends TestCase
 
         $after = ItemBranch::where('item_id', 1001)->where('branch_id', 201)->first();
         $this->assertEquals($stockBefore + 4, $after->current_stock);
-        $this->assertContains($order->fresh()->status, ['Backorder', 'Complete', 'Received']);
+        $this->assertSame('Ordered', $order->fresh()->status);
+        $expected = round(($stockBefore * $costBefore + 4 * 30) / ($stockBefore + 4), 4);
+        $this->assertEqualsWithDelta($expected, (float) $after->unit_cost, 0.0001);
     }
 
     public function test_hos_is_not_a_valid_role_constant(): void
