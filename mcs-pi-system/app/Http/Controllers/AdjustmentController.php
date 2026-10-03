@@ -44,7 +44,7 @@ class AdjustmentController extends Controller
         $type = $data['adjustment_type'];
 
         try {
-        DB::transaction(function () use ($data, $branchId, $qty, $type) {
+        IdGenerator::create('adjustments', 'adjustment_number', 5001, 5999, $data['adjustment_number'] ?? null, function ($num) use ($data, $branchId, $qty, $type) {
             $ib = ItemBranch::where('item_id', $data['item_id'])->where('branch_id', $branchId)->lockForUpdate()->first();
             if (!$ib) {
                 throw new \RuntimeException('Item is not stocked at this branch.');
@@ -53,7 +53,6 @@ class AdjustmentController extends Controller
                 throw new \RuntimeException("Insufficient stock for OUT. Available: {$ib->current_stock}");
             }
 
-            $num = $data['adjustment_number'] ?? IdGenerator::next('adjustments', 'adjustment_number', 5001, 5999);
             Adjustment::create([
                 'adjustment_number' => $num,
                 'adjustment_type' => $type,

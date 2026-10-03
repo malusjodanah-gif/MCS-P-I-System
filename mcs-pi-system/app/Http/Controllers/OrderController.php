@@ -43,7 +43,7 @@ class OrderController extends Controller
             'unit_cost' => 'required|numeric|min:0',
         ]);
 
-        $ge = $data['ge_number'] ?? ((Order::max('ge_number') ?? 1000) + 1);
+        $requestedGe = $data['ge_number'] ?? null;
         $desc = $data['item'] ?? null;
         $uom = null;
         $itemId = $data['item_id'] ?? null;
@@ -65,7 +65,11 @@ class OrderController extends Controller
         $qty = (int) $data['quantity'];
         $unit = (float) $data['unit_cost'];
 
-        DB::transaction(function () use ($ge, $data, $itemId, $desc, $uom, $qty, $unit) {
+        $ge = DB::transaction(function () use ($requestedGe, $data, $itemId, $desc, $uom, $qty, $unit) {
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['mcs-ge-allocation']);
+            }
+            $ge = $requestedGe ?? ((Order::max('ge_number') ?? 1000) + 1);
             // Serialize concurrent additions to a pre-allocated GE on PostgreSQL.
             if (DB::connection()->getDriverName() === 'pgsql') {
                 DB::select('SELECT pg_advisory_xact_lock(?)', [(int) $ge]);
@@ -96,7 +100,8 @@ class OrderController extends Controller
                 'total_cost' => round($qty * $unit, 2),
                 'status' => 'Pending',
             ]);
-        });
+            return $ge;
+        }, 5);
 
         return redirect()->route('orders.index')->with('success', "GE #{$ge} created (Pending). Status is updated manually by Purchasing.");
     }
@@ -153,6 +158,9 @@ class OrderController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $order, $data) {
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('SELECT pg_advisory_xact_lock(?)', [(int) $order->ge_number]);
+            }
             $query = Order::query();
             $lines = ($request->boolean('update_whole_ge')
                 ? $query->where('ge_number', $order->ge_number)

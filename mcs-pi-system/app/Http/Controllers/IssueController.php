@@ -46,7 +46,7 @@ class IssueController extends Controller
         $qty = (int) $data['quantity'];
 
         try {
-        DB::transaction(function () use ($data, $branchId, $qty) {
+        IdGenerator::create('issues', 'issue_number', 7001, 7999, $data['issue_number'] ?? null, function ($num) use ($data, $branchId, $qty) {
             $ib = ItemBranch::where('item_id', $data['item_id'])->where('branch_id', $branchId)->lockForUpdate()->first();
             if (!$ib) {
                 throw new \RuntimeException('Item is not stocked at this branch.');
@@ -55,7 +55,6 @@ class IssueController extends Controller
                 throw new \RuntimeException("Insufficient stock. Available: {$ib->current_stock}");
             }
 
-            $num = $data['issue_number'] ?? IdGenerator::next('issues', 'issue_number', 7001, 7999);
             Issue::create([
                 'issue_number' => $num,
                 'branch_id' => $branchId,

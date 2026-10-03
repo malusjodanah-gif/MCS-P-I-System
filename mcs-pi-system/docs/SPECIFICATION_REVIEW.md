@@ -48,8 +48,10 @@ The repository PDF retains the same governing business rules as the v4 report co
   before adding any additional automatic stock movement.
 - GE header/line and receipt schemas use surrogate IDs instead of the specification's stated
   GE/PO primary keys. This supports many lines and partial receipts; explain it in the ERD.
-- ID allocation uses `max + 1`. Concurrent new transactions can collide on IDs; uniqueness
-  protects records, but friendly retry/sequence handling remains additional hardening work.
+- ID allocation is serialized on PostgreSQL through advisory locks held through insertion.
+  Requested numbers are rechecked after locking; exhausted ranges report validation errors.
+  Automatic GE allocation and whole-GE status changes also coordinate with creation locks.
+  True simultaneous multi-process load testing remains an acceptance check.
 - Branch/user administration is Administrator-only as the reports describe. The v4 prose gives
   broad staff access, so document this narrower administration policy explicitly.
 - Existing records with mixed GE headers, STOCK orders with null items, or invalid asset links
@@ -80,7 +82,7 @@ Local source review completed; JSON and workflow YAML parse checks and `git diff
 PHP/Composer are not available in this execution environment, and the PHP installer host was
 unreachable. Local Laravel/PHPUnit execution has therefore not occurred.
 The first GitHub Actions run passed PHP syntax, route and Blade checks and 32 tests / 146 assertions on SQLite and PostgreSQL 16 (PHP 8.5), commit `50563631da1654508ddb414fbe3c57e4d8f604e7`.
-Additional transaction editing, branch selection and receipt reversal coverage is being validated in the updated PR.
+Additional transaction editing, branch selection, receipt reversal, management screens and ID-allocation coverage is included in the final PR checks.
 Passing these regression tests will not replace user acceptance checks for the open requirements.
 
 ## Demonstration and acceptance checklist

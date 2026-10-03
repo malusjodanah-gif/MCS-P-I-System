@@ -8,9 +8,11 @@ use App\Models\ItemBranch;
 use App\Models\Order;
 use App\Models\Receipt;
 use App\Models\User;
+use App\Support\IdGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class SpecificationRegressionTest extends TestCase
@@ -481,5 +483,36 @@ class SpecificationRegressionTest extends TestCase
         $this->actingAs(User::findOrFail('admin'))->delete('/users/po1')->assertSessionHasErrors('delete');
         $this->assertDatabaseHas('users', ['user_id' => 'po1']);
         $this->assertDatabaseHas('orders', ['user_id' => 'po1']);
+    }
+
+    public function test_automatic_ids_are_allocated_within_the_creation_transaction(): void
+    {
+        $this->actingAs(User::findOrFail('po1'));
+        $payload = ['customer' => 'Test customer', 'customer_type' => 'MCS'];
+        $before = DB::table('customers')->max('customer_id');
+        $this->post('/customers', $payload)->assertSessionHasNoErrors();
+        $this->post('/customers', $payload)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('customers', ['customer_id' => $before + 1]);
+        $this->assertDatabaseHas('customers', ['customer_id' => $before + 2]);
+        $firstGe = (Order::max('ge_number') ?? 1000) + 1;
+        $order = ['inventory_flag' => 'STOCK', 'supplier_id' => 5001,
+            'item_id' => 1001, 'quantity' => 1, 'unit_cost' => 2];
+        $this->post('/orders', $order)->assertSessionHasNoErrors();
+        $this->post('/orders', $order)->assertSessionHasNoErrors();
+        $this->assertSame(1, Order::where('ge_number', $firstGe)->count());
+        $this->assertSame(1, Order::where('ge_number', $firstGe + 1)->count());
+    }
+
+    public function test_id_allocator_rechecks_requested_ids_after_acquiring_its_lock(): void
+    {
+        $this->expectException(ValidationException::class);
+        IdGenerator::create('customers', 'customer_id', 4001, 4999, 4001,
+            fn ($id) => DB::table('customers')->insert(['customer_id' => $id, 'customer' => 'Duplicate', 'customer_type' => 'MCS']));
+    }
+
+    public function test_exhausted_id_range_returns_validation_instead_of_a_server_error(): void
+    {
+        $this->expectException(ValidationException::class);
+        IdGenerator::next('customers', 'customer_id', 4001, 4001);
     }
 }

@@ -28,8 +28,8 @@ class CustomerController extends Controller
             'customer_type' => 'required|in:STAFF,STUDENT,MCS',
             'email' => 'nullable|email|max:255',
         ]);
-        $data['customer_id'] = $data['customer_id'] ?? IdGenerator::next('customers', 'customer_id', 4001, 4999);
-        Customer::create($data);
+        IdGenerator::create('customers', 'customer_id', 4001, 4999, $data['customer_id'] ?? null,
+            fn ($id) => Customer::create(array_replace($data, ['customer_id' => $id])));
         return redirect()->route('customers.index')->with('success', 'Customer created.');
     }
 

@@ -42,8 +42,8 @@ class AssetController extends Controller
             'item_id' => ['required', Rule::exists('items', 'item_id')->where('category', 'ASSET'),
                 Rule::exists('item_branches', 'item_id')->where('branch_id', $request->input('branch_id'))],
         ]);
-        $data['asset_id'] = $data['asset_id'] ?? IdGenerator::next('assets', 'asset_id', 3001, 3999);
-        Asset::create($data);
+        IdGenerator::create('assets', 'asset_id', 3001, 3999, $data['asset_id'] ?? null,
+            fn ($id) => Asset::create(array_replace($data, ['asset_id' => $id])));
         return redirect()->route('assets.index')->with('success', 'Asset created.');
     }
 

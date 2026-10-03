@@ -30,8 +30,8 @@ class SupplierController extends Controller
             'payment_term' => 'required|in:CASH,CREDIT',
             'currency' => 'required|string|max:10',
         ]);
-        $data['supplier_id'] = $data['supplier_id'] ?? IdGenerator::next('suppliers', 'supplier_id', 5001, 5999);
-        Supplier::create($data);
+        IdGenerator::create('suppliers', 'supplier_id', 5001, 5999, $data['supplier_id'] ?? null,
+            fn ($id) => Supplier::create(array_replace($data, ['supplier_id' => $id])));
         return redirect()->route('suppliers.index')->with('success', 'Supplier created.');
     }
 

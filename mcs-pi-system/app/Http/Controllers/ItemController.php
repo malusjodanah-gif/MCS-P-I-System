@@ -46,10 +46,8 @@ class ItemController extends Controller
             'branch_id' => 'nullable|integer|exists:branches,branch_id',
         ]);
 
-        $id = $data['item_id'] ?? IdGenerator::next('items', 'item_id', 1001, 1999);
-
-        DB::transaction(function () use ($data, $id) {
-            Item::create([
+        $created = IdGenerator::create('items', 'item_id', 1001, 1999, $data['item_id'] ?? null, function ($id) use ($data) {
+            $item = Item::create([
                 'item_id' => $id,
                 'item' => $data['item'],
                 'uom' => $data['uom'],
@@ -69,9 +67,10 @@ class ItemController extends Controller
                     'reorder_quantity' => $data['reorder_quantity'] ?? 0,
                 ]);
             }
+            return $item;
         });
 
-        return redirect()->route('items.index')->with('success', "Item #{$id} created.");
+        return redirect()->route('items.index')->with('success', "Item #{$created->item_id} created.");
     }
 
     public function edit(Item $item)
