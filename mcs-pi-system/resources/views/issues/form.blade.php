@@ -1,6 +1,6 @@
 @extends('layouts.app')
-@section('title', 'Create Issue')
 @php $row = $row ?? null; @endphp
+@section('title', $row ? 'Edit Issue' : 'Create Issue')
 @section('content')
 <div class="card" style="max-width:560px">
     <form method="POST" action="{{ $row ? route('issues.update', $row) : route('issues.store') }}">
@@ -46,7 +46,7 @@
             </div>
         </div>
         <div class="mt-2 btn-group">
-            <button type="submit" class="btn btn-primary">Issue</button>
+            <button type="submit" class="btn btn-primary">{{ $row ? 'Save Issue' : 'Issue' }}</button>
             <a href="{{ route('issues.index') }}" class="btn btn-secondary">Cancel</a>
         </div>
     </form>

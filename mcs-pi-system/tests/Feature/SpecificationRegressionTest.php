@@ -444,4 +444,42 @@ class SpecificationRegressionTest extends TestCase
         $this->patch(route('orders.status', $order), ['status' => 'Cancelled'])->assertSessionHasNoErrors();
         $this->assertSame('Cancelled', $order->fresh()->status);
     }
+
+    public function test_receipts_can_be_cancelled_in_reverse_order_with_exact_cost_restoration(): void
+    {
+        $order = $this->order();
+        $before = $this->stock();
+        $quantity = $before->current_stock;
+        $cost = (float) $before->unit_cost;
+        $this->receipt($order, 4)->assertSessionHasNoErrors();
+        $first = $order->receipts()->firstOrFail();
+        $this->receipt($order, 2)->assertSessionHasNoErrors();
+        $last = $order->receipts()->orderByDesc('receipt_id')->firstOrFail();
+        $this->delete(route('receipts.destroy', $first))->assertSessionHasErrors('quantity_received');
+        $this->delete(route('receipts.destroy', $last))->assertSessionHasNoErrors();
+        $this->delete(route('receipts.destroy', $first))->assertSessionHasNoErrors();
+        $this->assertSame($quantity, $this->stock()->current_stock);
+        $this->assertEqualsWithDelta($cost, (float) $this->stock()->unit_cost, 0.0001);
+    }
+
+    public function test_admin_can_load_operational_and_management_screens(): void
+    {
+        $this->actingAs(User::findOrFail('admin'));
+        foreach (['dashboard', 'orders', 'orders/create', 'suppliers', 'suppliers/create',
+            'suppliers/5001/edit', 'receipts', 'receipts/create', 'items', 'items/create',
+            'items/1001/edit', 'item-branch', 'item-branch/create', 'item-branch/1001/201/edit',
+            'customers', 'customers/create', 'customers/4001/edit', 'assets', 'assets/create',
+            'assets/3001/edit', 'issues', 'adjustments', 'reports', 'reports/stock',
+            'reports/purchases', 'reports/issues', 'reports/reorder', 'users', 'users/create',
+            'users/po1/edit', 'branches', 'branches/create', 'branches/201/edit'] as $path) {
+            $this->get('/'.$path)->assertOk();
+        }
+    }
+
+    public function test_referenced_users_cannot_be_deleted_and_receive_a_clear_error(): void
+    {
+        $this->actingAs(User::findOrFail('admin'))->delete('/users/po1')->assertSessionHasErrors('delete');
+        $this->assertDatabaseHas('users', ['user_id' => 'po1']);
+        $this->assertDatabaseHas('orders', ['user_id' => 'po1']);
+    }
 }

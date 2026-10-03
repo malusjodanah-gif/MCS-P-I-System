@@ -1,8 +1,8 @@
 @extends('layouts.app')
-@section('title', 'Inventory Levels')
+@section('title', 'Item Branch')
 @section('actions')
 @if(auth()->user()->canWriteInventory())
-<a href="{{ route('itembranch.create') }}" class="btn btn-primary">Add Inventory Level</a>
+<a href="{{ route('itembranch.create') }}" class="btn btn-primary">Add Item Branch</a>
 @endif
 @endsection
 @section('content')

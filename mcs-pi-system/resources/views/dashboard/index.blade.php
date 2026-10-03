@@ -27,7 +27,7 @@
         @if(auth()->user()->canWriteInventory())
             <a class="btn btn-primary" href="{{ route('issues.create') }}">Issue stock</a>
         @endif
-        <a class="btn btn-secondary" href="{{ route('itembranch.index') }}">Stock Levels</a>
+        <a class="btn btn-secondary" href="{{ route('itembranch.index') }}">Item Branch</a>
         <a class="btn btn-secondary" href="{{ route('reports.index') }}">Reports</a>
     </div>
 </div>
