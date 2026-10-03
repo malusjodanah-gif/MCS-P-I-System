@@ -1,0 +1,102 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Item;
+use App\Models\Supplier;
+use App\Models\ItemBranch;
+use App\Support\IdGenerator;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class ItemController extends Controller
+{
+    public function index()
+    {
+        $rows = Item::with('supplier')->orderBy('item_id')->get();
+        return view('items.index', compact('rows'));
+    }
+
+    public function create()
+    {
+        $nextId = IdGenerator::next('items', 'item_id', 1001, 1999);
+        $suppliers = Supplier::orderBy('supplier')->get();
+        return view('items.form', ['row' => null, 'nextId' => $nextId, 'suppliers' => $suppliers]);
+    }
+
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'item_id' => 'nullable|integer|between:1001,1999|unique:items,item_id',
+            'item' => 'required|string|max:255',
+            'uom' => 'required|string|max:50',
+            'category' => 'required|in:ASSET,CONSUMABLE',
+            'sub_category' => 'required|string|max:100',
+            'supplier_id' => 'nullable|exists:suppliers,supplier_id',
+            'create_stock' => 'nullable|boolean',
+            'current_stock' => 'nullable|integer|min:0',
+            'unit_cost' => 'nullable|numeric|min:0',
+            'location' => 'nullable|string|max:255',
+            'reorder_level' => 'nullable|integer|min:0',
+            'reorder_quantity' => 'nullable|integer|min:0',
+            'branch_id' => 'nullable|integer',
+        ]);
+
+        $id = $data['item_id'] ?? IdGenerator::next('items', 'item_id', 1001, 1999);
+
+        DB::transaction(function () use ($data, $id) {
+            Item::create([
+                'item_id' => $id,
+                'item' => $data['item'],
+                'uom' => $data['uom'],
+                'category' => $data['category'],
+                'sub_category' => $data['sub_category'],
+                'supplier_id' => $data['supplier_id'] ?? null,
+            ]);
+            if ($data['create_stock'] ?? true) {
+                ItemBranch::create([
+                    'item_id' => $id,
+                    'branch_id' => $data['branch_id'] ?? 201,
+                    'uom' => $data['uom'],
+                    'current_stock' => $data['current_stock'] ?? 0,
+                    'unit_cost' => $data['unit_cost'] ?? 0,
+                    'location' => $data['location'] ?? 'Unassigned',
+                    'reorder_level' => $data['reorder_level'] ?? 0,
+                    'reorder_quantity' => $data['reorder_quantity'] ?? 0,
+                ]);
+            }
+        });
+
+        return redirect()->route('items.index')->with('success', "Item #{$id} created.");
+    }
+
+    public function edit(Item $item)
+    {
+        $suppliers = Supplier::orderBy('supplier')->get();
+        return view('items.form', ['row' => $item, 'nextId' => null, 'suppliers' => $suppliers]);
+    }
+
+    public function update(Request $request, Item $item)
+    {
+        $data = $request->validate([
+            'item' => 'required|string|max:255',
+            'uom' => 'required|string|max:50',
+            'category' => 'required|in:ASSET,CONSUMABLE',
+            'sub_category' => 'required|string|max:100',
+            'supplier_id' => 'nullable|exists:suppliers,supplier_id',
+        ]);
+        $item->update($data);
+        return redirect()->route('items.index')->with('success', 'Item updated.');
+    }
+
+    public function destroy(Item $item)
+    {
+        try {
+            ItemBranch::where('item_id', $item->item_id)->delete();
+            $item->delete();
+            return redirect()->route('items.index')->with('success', 'Item deleted.');
+        } catch (\Throwable $e) {
+            return back()->withErrors(['delete' => 'Cannot delete: item is referenced by other records.']);
+        }
+    }
+}
