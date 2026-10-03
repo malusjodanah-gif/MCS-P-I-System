@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
@@ -69,7 +70,7 @@ class UserController extends Controller
             return back()->withErrors(['delete' => 'You cannot delete your own account.']);
         }
         try {
-            $user->delete();
+            DB::transaction(fn () => $user->delete());
         } catch (QueryException $e) {
             return back()->withErrors(['delete' => 'Cannot delete: this user is referenced by purchasing or inventory records.']);
         }
