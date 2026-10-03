@@ -1,299 +1,85 @@
-MCS Purchasing & Inventory Tracking System (v4)
+# MCS Purchasing and Inventory Tracking System
 
-Stack: Laravel 11/12 + PostgreSQL
-Theme: Icy Blue & Silver
-IDE: VSCodium / VS Code
+Laravel 13 (locked version 13.30.1), PHP 8.3+, PostgreSQL, server-rendered Blade.
+Theme: icy blue and silver. Application root: `mcs-pi-system/`.
 
-Complete database-driven application for the School of MCS (PNG University of Technology) covering Purchasing (GE orders) and Inventory.
+## Current verification status
 
+See [the specification review](docs/SPECIFICATION_REVIEW.md) for verified source findings,
+changes, regression coverage and unfinished requirements. Implemented features are not a
+claim of complete acceptance testing. CI runs PHP 8.5 against SQLite and PostgreSQL 16.
 
+## Setup
 
-Spec notes applied
+From the repository root:
 
-
-
-
-
-HoS on Branch is informational only.
-
-
-
-HoS is not a valid role. Allowed roles:
-Administrator · Purchasing Officer · Inventory Officer · EndUser
-
-
-
-GE order status is manually updated by Purchasing Officer / Administrator:
-{Pending} → {Approved/Rejected/Cancelled} → {Ordered} → {Received} → {Backorder/Complete}
-
-
-
-Requirements
-
-
-
-
-
-PHP 8.2+
-
-
-
-Composer
-
-
-
-PostgreSQL 14+ (or SQLite for local/quick test)
-
-
-
-Extensions: pdo_pgsql, pgsql, mbstring, xml, curl, zip
-
-
-
-Setup (VSCodium)
-
+```sh
 cd mcs-pi-system
-
-# Install PHP dependencies
 composer install
-
-# Environment
 cp .env.example .env
 php artisan key:generate
+```
 
-# Edit .env for PostgreSQL:
-#   DB_CONNECTION=pgsql
-#   DB_HOST=127.0.0.1
-#   DB_PORT=5432
-#   DB_DATABASE=mcs_pi
-#   DB_USERNAME=postgres
-#   DB_PASSWORD=your_password
+Create an empty PostgreSQL database `mcs_pi`, then configure `DB_HOST`, `DB_PORT`,
+`DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD` in `.env`.
 
-# Create database in PostgreSQL first:
-#   CREATE DATABASE mcs_pi;
-
-php artisan migrate --seed
-
+```sh
+php artisan migrate
+# For a NEW demonstration database only:
+php artisan db:seed
 php artisan serve
+```
 
-Open http://127.0.0.1:8000
+Open http://127.0.0.1:8000. Existing installations should use `php artisan migrate`,
+without resetting or reseeding existing records. `migrate:fresh` destroys database data.
 
-Demo accounts
+Demo-only accounts:
 
+| User ID | Password | Role |
+| --- | --- | --- |
+| admin | admin123 | Administrator |
+| po1 | po123 | Purchasing Officer |
+| io1 | io123 | Inventory Officer |
+| eu1 | eu123 | EndUser |
 
+Create individual accounts and change demonstration passwords before operational use.
 
+## Roles and stock behavior
 
+Administrator has full access. Purchasing Officer can write purchasing and inventory.
+Inventory Officer can write inventory. EndUser can view operational information.
+User and branch administration remain Administrator functions as documented in the reports.
+HoS is an informational branch field, never an authorization role.
 
+GE status is changed manually by Purchasing Officer or Administrator:
+Pending → Approved/Rejected/Cancelled; Approved → Ordered; Ordered → Received;
+Received → Backorder/Complete; Backorder → Received/Complete.
+Cancellation is allowed only before receipts. Receiving stock updates quantity and weighted
+average cost; it does not change GE status. Complete requires full receipt, while Backorder
+requires a partial receipt. A PO number is allocated when Approved progresses to Ordered.
 
+Stock starts at zero in new Item Branch records. Use Receipts and Adjustments to record
+stock. Seeded opening balances are demonstration fixtures. Current Stock and UOM cannot
+be overwritten through Item Branch forms. Unit Cost remains manually maintainable.
 
-User ID
+## Tests
 
+```sh
+php artisan test
+php artisan route:list --except-vendor
+php artisan view:cache
+```
 
+Tests default to an isolated in-memory SQLite database. To test PostgreSQL, point the
+following variables at an EMPTY dedicated test database (never your operational database):
 
-Password
+```sh
+DB_CONNECTION=pgsql DB_DATABASE=mcs_pi_test DB_HOST=127.0.0.1 DB_PORT=5432 DB_USERNAME=postgres DB_PASSWORD=testing php artisan test
+```
 
+CI repeats the full suite on both database engines. Regression tests cover composite stock
+keys, migrations/seeding, real login with database sessions, roles, receipt quantities and
+costing, manual statuses, cancellation, multi-line GE consistency and operational references.
 
-
-Role
-
-
-
-
-
-admin
-
-
-
-admin123
-
-
-
-Administrator
-
-
-
-
-
-po1
-
-
-
-po123
-
-
-
-Purchasing Officer
-
-
-
-
-
-io1
-
-
-
-io123
-
-
-
-Inventory Officer
-
-
-
-
-
-eu1
-
-
-
-eu123
-
-
-
-EndUser (view only)
-
-
-
-Quick test without PostgreSQL
-
-# In .env set:
-DB_CONNECTION=sqlite
-# touch database/database.sqlite
-php artisan migrate --seed
-php artisan serve
-
-
-
-Running the full functionality tests
-
-php artisan test --filter=McsPiSystemTest
-# or
-./vendor/bin/phpunit --filter=McsPiSystemTest
-
-Tests cover:
-
-
-
-
-
-Login & dashboard access
-
-
-
-Role permissions (EndUser blocked from creating orders)
-
-
-
-GE order creation (Pending)
-
-
-
-Manual status update
-
-
-
-Receipt → stock increase + weighted unit cost
-
-
-
-Receipt blocked while status is still Pending
-
-
-
-HoS is not in User::ROLES
-
-
-
-Modules
-
-
-
-
-
-
-
-Area
-
-
-
-Features
-
-
-
-
-
-Purchasing
-
-
-
-GE Orders (STOCK/NON-STOCK), manual status, Suppliers, Receipts (partial + weighted avg cost)
-
-
-
-
-
-Inventory
-
-
-
-Items, ItemBranch stock, Issues, Adjustments, Customers, Assets
-
-
-
-
-
-Reports
-
-
-
-Stock levels, reorder list, purchase summary, issue history
-
-
-
-
-
-Common
-
-
-
-Role-based access, Branches (HoS info-only)
-
-Unit cost on STOCK receipt
-
-Unit Cost = (AmountReceived + currentValue) / (QtyReceived + currentStock)
-
-
-
-Project layout (key paths)
-
-app/Models/           Branch, User, Supplier, Item, ItemBranch, Order, Receipt, …
-app/Http/Controllers/ Dashboard, Order, Receipt, Stock, Report, Auth, …
-app/Http/Middleware/  EnsureRole
-database/migrations/  All MCS tables (PostgreSQL-ready)
-database/seeders/     Demo users, suppliers, items, stock, customers
-resources/views/      Blade UI with icy blue & silver theme
-public/css/theme.css  Theme
-tests/Feature/        McsPiSystemTest.php
-
-
-
-Development tips
-
-
-
-
-
-php artisan migrate:fresh --seed resets data.
-
-
-
-Frontend is server-rendered Blade; no Node build required for basic use.
-
-
-
-Role middleware: ->middleware('role:Purchasing Officer') (Administrator always allowed).
-
-
-
-Change history: see CHANGELOG.md. For future edits, append a dated entry there listing files touched.
-
+See [CHANGELOG.md](CHANGELOG.md) for corrections and [docs/SPECIFICATION_REVIEW.md](docs/SPECIFICATION_REVIEW.md)
+for remaining work and the demonstration checklist.

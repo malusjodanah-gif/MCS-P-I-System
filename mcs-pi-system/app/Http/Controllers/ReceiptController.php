@@ -8,6 +8,7 @@ use App\Models\Receipt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ReceiptController extends Controller
 {
@@ -33,19 +34,24 @@ class ReceiptController extends Controller
     {
         $data = $request->validate([
             'order_line_id' => 'required|exists:orders,order_line_id',
-            'quantity_received' => 'required|integer|min:0',
+            'quantity_received' => 'required|integer|min:1',
             'received_by' => 'required|string|max:100',
             'grn' => 'nullable|string|max:100',
         ]);
 
-        $order = Order::findOrFail($data['order_line_id']);
-        if (!in_array($order->status, ['Approved', 'Ordered', 'Backorder', 'Received'], true)) {
-            return back()->withErrors(['order_line_id' => 'Order must be Approved/Ordered before receipt.'])->withInput();
-        }
-
         $qtyRecv = (int) $data['quantity_received'];
 
-        DB::transaction(function () use ($order, $data, $qtyRecv) {
+        DB::transaction(function () use ($data, $qtyRecv) {
+            // Serialize receipts of the same line before checking the remainder.
+            $order = Order::whereKey($data['order_line_id'])->lockForUpdate()->firstOrFail();
+            if (!in_array($order->status, ['Approved', 'Ordered', 'Backorder', 'Received'], true)) {
+                throw ValidationException::withMessages(['order_line_id' => 'Order must be Approved/Ordered before receipt.']);
+            }
+            $received = (int) $order->receipts()->sum('quantity_received');
+            $remaining = $order->quantity - $received;
+            if ($qtyRecv > $remaining) {
+                throw ValidationException::withMessages(['quantity_received' => "Only {$remaining} units remain on this order line."]);
+            }
             Receipt::create([
                 'po_number' => $order->po_number ?? $order->ge_number,
                 'branch_id' => $order->branch_id,
@@ -68,7 +74,7 @@ class ReceiptController extends Controller
                     ->lockForUpdate()
                     ->first();
                 if (!$ib) {
-                    throw new \RuntimeException("No ItemBranch for item {$order->item_id} / branch {$order->branch_id}");
+                    throw ValidationException::withMessages(['order_line_id' => 'Create an Item Branch location for this item and branch before receiving stock.']);
                 }
                 $currentStock = $ib->current_stock;
                 $currentCost = (float) $ib->unit_cost;
@@ -84,15 +90,7 @@ class ReceiptController extends Controller
                 $ib->save();
             }
 
-            $totalRecv = Receipt::where('order_line_id', $order->order_line_id)->sum('quantity_received');
-            if ($totalRecv >= $order->quantity) {
-                $order->status = 'Complete';
-            } elseif ($totalRecv > 0) {
-                $order->status = 'Backorder';
-            } else {
-                $order->status = 'Received';
-            }
-            $order->save();
+            // GE status remains a manual Purchasing Officer/Administrator action.
         });
 
         return redirect()->route('receipts.index')->with('success', 'Receipt recorded.');

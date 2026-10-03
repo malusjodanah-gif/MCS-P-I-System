@@ -13,7 +13,7 @@
             </select>
         </div>
         <div class="form-grid mt-1">
-            <div class="form-group"><label>Qty Received</label><input type="number" name="quantity_received" min="0" value="1" required></div>
+            <div class="form-group"><label>Qty Received</label><input type="number" name="quantity_received" min="1" value="{{ old('quantity_received', 1) }}" required></div>
             <div class="form-group"><label>Received By</label><input type="text" name="received_by" value="{{ auth()->user()->name }}" required></div>
             <div class="form-group"><label>GRN / Invoice #</label><input type="text" name="grn"></div>
         </div>

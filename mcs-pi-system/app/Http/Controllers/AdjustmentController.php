@@ -9,6 +9,7 @@ use App\Support\IdGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AdjustmentController extends Controller
 {
@@ -31,7 +32,7 @@ class AdjustmentController extends Controller
             'adjustment_number' => 'nullable|integer|between:5001,5999|unique:adjustments,adjustment_number',
             'adjustment_type' => 'required|in:IN,OUT',
             'item_id' => 'required|exists:items,item_id',
-            'branch_id' => 'nullable|integer',
+            'branch_id' => 'nullable|integer|exists:branches,branch_id',
             'quantity' => 'required|integer|min:1',
             'purpose' => 'nullable|string|max:500',
         ]);
@@ -78,15 +79,19 @@ class AdjustmentController extends Controller
     public function destroy(Adjustment $adjustment)
     {
         DB::transaction(function () use ($adjustment) {
+            $adjustment = Adjustment::whereKey($adjustment->getKey())->lockForUpdate()->firstOrFail();
             $ib = ItemBranch::where('item_id', $adjustment->item_id)
                 ->where('branch_id', $adjustment->branch_id)->lockForUpdate()->first();
-            if ($ib) {
-                // reverse the adjustment
-                $ib->current_stock = $adjustment->adjustment_type === 'IN'
-                    ? max(0, $ib->current_stock - $adjustment->quantity)
-                    : $ib->current_stock + $adjustment->quantity;
-                $ib->save();
+            if (!$ib) {
+                throw ValidationException::withMessages(['delete' => 'The Item Branch is missing; cancellation cannot reverse stock.']);
             }
+            if ($adjustment->adjustment_type === 'IN' && $ib->current_stock < $adjustment->quantity) {
+                throw ValidationException::withMessages(['delete' => 'Cannot cancel: the added stock has already been used.']);
+            }
+            $ib->current_stock = $adjustment->adjustment_type === 'IN'
+                ? $ib->current_stock - $adjustment->quantity
+                : $ib->current_stock + $adjustment->quantity;
+            $ib->save();
             $adjustment->delete();
         });
         return redirect()->route('adjustments.index')->with('success', 'Adjustment cancelled and stock reversed.');

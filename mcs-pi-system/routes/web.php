@@ -85,8 +85,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
     });
 
-    // Issue (ISSUE table) & Adjustment — Inventory Officer (and Admin); PO can view only
-    Route::middleware('role:Inventory Officer')->group(function () {
+    // Specification v4 grants Purchasing Officers full inventory access.
+    Route::middleware('role:Purchasing Officer,Inventory Officer')->group(function () {
         Route::get('/issues/create', [IssueController::class, 'create'])->name('issues.create');
         Route::post('/issues', [IssueController::class, 'store'])->name('issues.store');
         Route::delete('/issues/{issue}', [IssueController::class, 'destroy'])->name('issues.destroy');

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Purchase Receipts')
 @section('actions')
-@if(auth()->user()->canWritePurchasing() || auth()->user()->canWriteInventory())
+@if(auth()->user()->canWritePurchasing())
 <a href="{{ route('receipts.create') }}" class="btn btn-primary">Add Receipt</a>
 @endif
 @endsection

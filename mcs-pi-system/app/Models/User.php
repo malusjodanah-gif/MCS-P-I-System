@@ -50,7 +50,7 @@ class User extends Authenticatable
 
     public function canWriteInventory(): bool
     {
-        return in_array($this->role, ['Administrator', 'Inventory Officer'], true);
+        return in_array($this->role, ['Administrator', 'Purchasing Officer', 'Inventory Officer'], true);
     }
 
     public function getAuthIdentifierName()

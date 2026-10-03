@@ -8,6 +8,8 @@ use App\Models\ItemBranch;
 use App\Support\IdGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ItemController extends Controller
 {
@@ -31,15 +33,17 @@ class ItemController extends Controller
             'item' => 'required|string|max:255',
             'uom' => 'required|string|max:50',
             'category' => 'required|in:ASSET,CONSUMABLE',
-            'sub_category' => 'required|string|max:100',
+            'sub_category' => ['required', Rule::in($request->input('category') === 'ASSET'
+                ? ['Computer', 'ICT Equipment', 'Tools Equipment', 'Fixtures & Furniture']
+                : ['Stationery', 'Cleaning', 'General', 'Staff'])],
             'supplier_id' => 'nullable|exists:suppliers,supplier_id',
             'create_stock' => 'nullable|boolean',
-            'current_stock' => 'nullable|integer|min:0',
+            'current_stock' => 'nullable|integer|in:0',
             'unit_cost' => 'nullable|numeric|min:0',
-            'location' => 'nullable|string|max:255',
+            'location' => 'required_unless:create_stock,0|string|max:255',
             'reorder_level' => 'nullable|integer|min:0',
             'reorder_quantity' => 'nullable|integer|min:0',
-            'branch_id' => 'nullable|integer',
+            'branch_id' => 'nullable|integer|exists:branches,branch_id',
         ]);
 
         $id = $data['item_id'] ?? IdGenerator::next('items', 'item_id', 1001, 1999);
@@ -58,9 +62,9 @@ class ItemController extends Controller
                     'item_id' => $id,
                     'branch_id' => $data['branch_id'] ?? 201,
                     'uom' => $data['uom'],
-                    'current_stock' => $data['current_stock'] ?? 0,
+                    'current_stock' => 0,
                     'unit_cost' => $data['unit_cost'] ?? 0,
-                    'location' => $data['location'] ?? 'Unassigned',
+                    'location' => $data['location'],
                     'reorder_level' => $data['reorder_level'] ?? 0,
                     'reorder_quantity' => $data['reorder_quantity'] ?? 0,
                 ]);
@@ -82,18 +86,34 @@ class ItemController extends Controller
             'item' => 'required|string|max:255',
             'uom' => 'required|string|max:50',
             'category' => 'required|in:ASSET,CONSUMABLE',
-            'sub_category' => 'required|string|max:100',
+            'sub_category' => ['required', Rule::in($request->input('category') === 'ASSET'
+                ? ['Computer', 'ICT Equipment', 'Tools Equipment', 'Fixtures & Furniture']
+                : ['Stationery', 'Cleaning', 'General', 'Staff'])],
             'supplier_id' => 'nullable|exists:suppliers,supplier_id',
         ]);
-        $item->update($data);
+        DB::transaction(function () use ($item, $data) {
+            $item->update($data);
+            ItemBranch::where('item_id', $item->item_id)->update(['uom' => $item->uom]);
+        });
         return redirect()->route('items.index')->with('success', 'Item updated.');
     }
 
     public function destroy(Item $item)
     {
         try {
-            ItemBranch::where('item_id', $item->item_id)->delete();
-            $item->delete();
+            DB::transaction(function () use ($item) {
+                $item = Item::whereKey($item->getKey())->lockForUpdate()->firstOrFail();
+                foreach (['orders', 'receipts', 'issues', 'adjustments', 'assets'] as $table) {
+                    if (DB::table($table)->where('item_id', $item->item_id)->exists()) {
+                        throw ValidationException::withMessages(['delete' => 'Cannot delete an item referenced by operational records.']);
+                    }
+                }
+                if (ItemBranch::where('item_id', $item->item_id)->where('current_stock', '>', 0)->exists()) {
+                    throw ValidationException::withMessages(['delete' => 'Cannot delete an item with stock remaining.']);
+                }
+                ItemBranch::where('item_id', $item->item_id)->delete();
+                $item->delete();
+            });
             return redirect()->route('items.index')->with('success', 'Item deleted.');
         } catch (\Throwable $e) {
             return back()->withErrors(['delete' => 'Cannot delete: item is referenced by other records.']);

@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\Item;
 use App\Support\IdGenerator;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AssetController extends Controller
 {
@@ -38,7 +39,8 @@ class AssetController extends Controller
             'branch_id' => 'required|exists:branches,branch_id',
             'status' => 'required|in:new,used,under repair,out-of-service',
             'po_number' => 'nullable|integer',
-            'item_id' => 'nullable|exists:items,item_id',
+            'item_id' => ['required', Rule::exists('items', 'item_id')->where('category', 'ASSET'),
+                Rule::exists('item_branches', 'item_id')->where('branch_id', $request->input('branch_id'))],
         ]);
         $data['asset_id'] = $data['asset_id'] ?? IdGenerator::next('assets', 'asset_id', 3001, 3999);
         Asset::create($data);
@@ -65,7 +67,8 @@ class AssetController extends Controller
             'branch_id' => 'required|exists:branches,branch_id',
             'status' => 'required|in:new,used,under repair,out-of-service',
             'po_number' => 'nullable|integer',
-            'item_id' => 'nullable|exists:items,item_id',
+            'item_id' => ['required', Rule::exists('items', 'item_id')->where('category', 'ASSET'),
+                Rule::exists('item_branches', 'item_id')->where('branch_id', $request->input('branch_id'))],
         ]);
         $asset->update($data);
         return redirect()->route('assets.index')->with('success', 'Asset updated.');

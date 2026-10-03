@@ -8,7 +8,20 @@ class ItemBranch extends Model
 {
     protected $table = 'item_branches';
     public $incrementing = false;
-    protected $primaryKey = null;
+    protected $primaryKey = 'item_id';
+    protected $keyType = 'int';
+
+    // Eloquent assumes one primary key. Scope every write by both columns.
+    protected function setKeysForSaveQuery($query)
+    {
+        return $query->where('item_id', $this->getRawOriginal('item_id') ?? $this->item_id)
+            ->where('branch_id', $this->getRawOriginal('branch_id') ?? $this->branch_id);
+    }
+
+    protected function setKeysForSelectQuery($query)
+    {
+        return $this->setKeysForSaveQuery($query);
+    }
 
     protected $fillable = [
         'item_id', 'branch_id', 'uom', 'current_stock', 'unit_cost',

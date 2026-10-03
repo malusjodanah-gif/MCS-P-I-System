@@ -10,6 +10,7 @@ use App\Models\Issue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class IssueController extends Controller
 {
@@ -23,7 +24,7 @@ class IssueController extends Controller
     {
         $items = Item::orderBy('item')->get();
         $customers = Customer::orderBy('customer')->get();
-        $stock = ItemBranch::all()->keyBy('item_id');
+        $stock = ItemBranch::where('branch_id', 201)->get()->keyBy('item_id');
         $nextId = IdGenerator::next('issues', 'issue_number', 7001, 7999);
         return view('issues.form', compact('items', 'customers', 'stock', 'nextId'));
     }
@@ -33,7 +34,7 @@ class IssueController extends Controller
         $data = $request->validate([
             'issue_number' => 'nullable|integer|between:7001,7999|unique:issues,issue_number',
             'item_id' => 'required|exists:items,item_id',
-            'branch_id' => 'nullable|integer',
+            'branch_id' => 'nullable|integer|exists:branches,branch_id',
             'quantity' => 'required|integer|min:1',
             'customer_id' => 'required|exists:customers,customer_id',
             'purpose' => 'nullable|string|max:500',
@@ -78,11 +79,13 @@ class IssueController extends Controller
     {
         // Reversing an issue restores stock
         DB::transaction(function () use ($issue) {
+            $issue = Issue::whereKey($issue->getKey())->lockForUpdate()->firstOrFail();
             $ib = ItemBranch::where('item_id', $issue->item_id)->where('branch_id', $issue->branch_id)->lockForUpdate()->first();
-            if ($ib) {
-                $ib->current_stock = $ib->current_stock + $issue->quantity;
-                $ib->save();
+            if (!$ib) {
+                throw ValidationException::withMessages(['delete' => 'The Item Branch is missing; cancellation cannot restore stock.']);
             }
+            $ib->current_stock = $ib->current_stock + $issue->quantity;
+            $ib->save();
             $issue->delete();
         });
         return redirect()->route('issues.index')->with('success', 'Issue cancelled and stock restored.');
