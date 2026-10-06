@@ -53,7 +53,7 @@ class PurchasingCompletionTest extends TestCase
         $before = ItemBranch::sum('current_stock');
         $this->post('/receipts', ['order_line_id' => $order->getKey(), 'quantity_received' => 2,
             'received_by' => 'Alpha', 'date_received' => '2026-10-04'])->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('receipts', ['order_line_id' => $order->getKey(), 'date_received' => '2026-10-04']);
+        $this->assertSame('2026-10-04', $order->receipts()->firstOrFail()->date_received->format('Y-m-d'));
         $this->assertEquals($before, ItemBranch::sum('current_stock'));
         $this->get('/receipts/create')->assertOk()
             ->assertViewHas('lines', fn ($lines) => !$lines->contains('order_line_id', $order->getKey()));
