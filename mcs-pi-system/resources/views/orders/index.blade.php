@@ -44,6 +44,9 @@
                                     <option value="{{ $s }}" @selected($s === $r->status)>{{ $s }}</option>
                                 @endforeach
                             </select>
+                            @if(in_array($r->status, ['Approved', 'Ordered']))
+                            <input type="number" name="po_number" min="1" max="2147483647" placeholder="PO Number (defaults to GE)" aria-label="PO Number" style="width:10rem">
+                            @endif
                             <label style="font-size:0.7rem;white-space:nowrap"><input type="checkbox" name="update_whole_ge" value="1"> whole GE</label>
                             <button class="btn btn-sm btn-secondary" type="submit">Set</button>
                         </form>
@@ -58,7 +61,7 @@
                 </tr>
                 @endforeach
             @empty
-                <tr><td colspan="16" class="text-muted">No GE orders yet.</td></tr>
+                <tr><td colspan="15" class="text-muted">No GE orders yet.</td></tr>
             @endforelse
             </tbody>
         </table>

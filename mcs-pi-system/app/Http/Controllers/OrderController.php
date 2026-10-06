@@ -155,11 +155,19 @@ class OrderController extends Controller
         $data = $request->validate([
             'status' => 'required|in:' . implode(',', Order::STATUSES),
             'update_whole_ge' => 'nullable|boolean',
+            'po_number' => 'nullable|integer|min:1|max:2147483647',
         ]);
 
         DB::transaction(function () use ($request, $order, $data) {
             if (DB::connection()->getDriverName() === 'pgsql') {
                 DB::select('SELECT pg_advisory_xact_lock(?)', [(int) $order->ge_number]);
+            }
+            if (!empty($data['po_number']) && $data['status'] !== 'Ordered') {
+                throw ValidationException::withMessages(['po_number' => 'Assign a PO Number when setting the order to Ordered.']);
+            }
+            // Serialize PO assignment across different GEs before checking supplier ownership.
+            if ($data['status'] === 'Ordered' && DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['mcs-po-assignment']);
             }
             $query = Order::query();
             $lines = ($request->boolean('update_whole_ge')
@@ -178,6 +186,15 @@ class OrderController extends Controller
                 if ($data['status'] !== $line->status && !in_array($data['status'], $allowed, true)) {
                     throw ValidationException::withMessages(['status' => "Cannot change {$line->status} to {$data['status']}."]);
                 }
+                if ($data['status'] === 'Ordered') {
+                    $po = $data['po_number'] ?? $line->po_number ?? $line->ge_number;
+                    if (Order::where('po_number', $po)->where('supplier_id', '!=', $line->supplier_id)->exists()) {
+                        throw ValidationException::withMessages(['po_number' => 'This PO Number belongs to another supplier.']);
+                    }
+                    if ($line->receipts()->where('po_number', '!=', $po)->exists()) {
+                        throw ValidationException::withMessages(['po_number' => 'This line already has receipts with a different PO Number.']);
+                    }
+                }
                 $received = (int) $line->receipts()->sum('quantity_received');
                 if ($data['status'] === 'Complete' && $received !== $line->quantity) {
                     throw ValidationException::withMessages(['status' => 'Receive the full ordered quantity before marking Complete.']);
@@ -195,7 +212,7 @@ class OrderController extends Controller
             foreach ($lines as $line) {
                 $line->status = $data['status'];
                 if ($line->status === 'Ordered') {
-                    $line->po_number = $line->po_number ?? $line->ge_number;
+                    $line->po_number = $data['po_number'] ?? $line->po_number ?? $line->ge_number;
                 }
                 $line->save();
             }
