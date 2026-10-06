@@ -11,7 +11,7 @@
         <table class="data">
             <thead>
                 <tr>
-                    <th>Adjustment Number</th><th>Type</th><th>Adjustment Date</th><th>Item</th><th>Quantity</th><th>Purpose</th><th>Created By</th>
+                    <th>Adjustment Number</th><th>Adjustment Type</th><th>Date</th><th>Branch ID</th><th>Item ID</th><th>Item</th><th>Quantity</th><th>UOM</th><th>Purpose</th><th>User ID</th>
                     @if(auth()->user()->canWriteInventory())<th>Action</th>@endif
                 </tr>
             </thead>
@@ -21,10 +21,13 @@
                     <td>{{ $r->adjustment_number }}</td>
                     <td><span class="badge badge-{{ strtolower($r->adjustment_type) }}">{{ $r->adjustment_type }}</span></td>
                     <td>{{ $r->adjustment_date->format('Y-m-d') }}</td>
-                    <td>{{ $r->item->item ?? $r->item_id }} <span class="text-muted">(#{{ $r->item_id }})</span></td>
-                    <td>{{ $r->quantity }} {{ $r->uom }}</td>
+                    <td>{{ $r->branch_id }}</td>
+                    <td>{{ $r->item_id }}</td>
+                    <td>{{ $r->item->item ?? $r->item_id }}</td>
+                    <td>{{ $r->quantity }}</td>
+                    <td>{{ $r->uom }}</td>
                     <td>{{ $r->purpose ?? '—' }}</td>
-                    <td>{{ $r->user->name ?? $r->user_id }}</td>
+                    <td>{{ $r->user_id }}</td>
                     @if(auth()->user()->canWriteInventory())
                     <td class="actions-cell">
                         <a href="{{ route('adjustments.edit', $r) }}" class="btn btn-sm btn-secondary">Edit</a>
@@ -36,7 +39,7 @@
                     @endif
                 </tr>
             @empty
-                <tr><td colspan="8" class="text-muted">No adjustments.</td></tr>
+                <tr><td colspan="11" class="text-muted">No adjustments.</td></tr>
             @endforelse
             </tbody>
         </table>

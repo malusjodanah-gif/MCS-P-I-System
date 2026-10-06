@@ -13,7 +13,7 @@
             </div>
             @endif
             <div class="form-group">
-                <label>Name</label>
+                <label>Supplier</label>
                 <input type="text" name="supplier" value="{{ old('supplier', $row->supplier ?? '') }}" required>
             </div>
             <div class="form-group">

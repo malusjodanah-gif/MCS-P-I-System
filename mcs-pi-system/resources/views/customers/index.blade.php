@@ -11,7 +11,7 @@
         <table class="data">
             <thead>
                 <tr>
-                    <th>Customer ID</th><th>Customer Name</th><th>Customer Type</th><th>Email</th>
+                    <th>Customer ID</th><th>Customer</th><th>Customer Type</th><th>Email</th>
                     @if(auth()->user()->canWriteInventory())<th>Action</th>@endif
                 </tr>
             </thead>

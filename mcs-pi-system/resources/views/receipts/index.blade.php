@@ -10,7 +10,7 @@
     <div class="table-wrap">
         <table class="data">
             <thead>
-                <tr><th>Receipt ID</th><th>PO / GE Number</th><th>Supplier</th><th>Item ID</th><th>Ordered Qty</th><th>Received Qty</th><th>Receipt Date</th><th>Received By</th><th>GRN / Invoice</th>@if(auth()->user()->canWritePurchasing())<th>Actions</th>@endif</tr>
+                <tr><th>Receipt ID</th><th>PO Number / GE Number</th><th>Supplier</th><th>Branch ID</th><th>UOM</th><th>Account Code</th><th>Item ID</th><th>Quantity Ordered</th><th>Quantity Received</th><th>Date Received</th><th>Received By</th><th>GRN / Invoice</th>@if(auth()->user()->canWritePurchasing())<th>Actions</th>@endif</tr>
             </thead>
             <tbody>
             @forelse($receipts as $r)
@@ -18,6 +18,9 @@
                     <td>{{ $r->receipt_id }}</td>
                     <td>{{ $r->po_number }}</td>
                     <td>{{ $r->supplier->supplier ?? $r->supplier_id }}</td>
+                    <td>{{ $r->branch_id }}</td>
+                    <td>{{ $r->uom }}</td>
+                    <td>{{ $r->account_code ?? '—' }}</td>
                     <td>{{ $r->item_id ?? '—' }}</td>
                     <td>{{ $r->quantity_ordered }}</td>
                     <td>{{ $r->quantity_received }}</td>
@@ -35,7 +38,7 @@
                     @endif
                 </tr>
             @empty
-                <tr><td colspan="9" class="text-muted">No receipts yet.</td></tr>
+                <tr><td colspan="13" class="text-muted">No receipts yet.</td></tr>
             @endforelse
             </tbody>
         </table>

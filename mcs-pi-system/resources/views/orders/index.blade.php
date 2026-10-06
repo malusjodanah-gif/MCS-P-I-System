@@ -11,8 +11,8 @@
         <table class="data">
             <thead>
                 <tr>
-                    <th>GE Number</th><th>Flag</th><th>Supplier</th><th>Order Date</th><th>Item</th>
-                    <th>Qty</th><th>Unit Cost</th><th>Total Cost</th><th>Status</th><th>Action</th>
+                    <th>GE Number</th><th>Inventory Flag</th><th>Supplier</th><th>Date</th><th>PO Number</th><th>Branch ID</th><th>Account Code</th><th>Item ID</th><th>Item</th>
+                    <th>Quantity</th><th>UOM</th><th>Unit Cost</th><th>Total Cost</th><th>Status</th><th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -23,8 +23,12 @@
                     <td>@if($idx===0)<span class="badge {{ $r->inventory_flag === 'STOCK' ? 'badge-stock' : 'badge-non-stock' }}">{{ $r->inventory_flag }}</span>@endif</td>
                     <td>@if($idx===0){{ $r->supplier->supplier ?? $r->supplier_id }}@endif</td>
                     <td>@if($idx===0){{ $r->order_date->format('Y-m-d') }}@endif</td>
-                    <td>{{ $r->item }} @if($r->item_id)<small class="text-muted">(#{{ $r->item_id }})</small>@endif</td>
-                    <td>{{ $r->quantity }} {{ $r->uom }}</td>
+                    <td>{{ $r->po_number ?? '—' }}</td>
+                    <td>{{ $r->branch_id }}</td>
+                    <td>{{ $r->account_code ?? '—' }}</td>
+                    <td>{{ $r->item_id ?? '—' }}</td>
+                    <td>{{ $r->item }}</td>
+                    <td>{{ $r->quantity }}</td><td>{{ $r->uom }}</td>
                     <td>{{ number_format($r->unit_cost, 2) }}</td>
                     <td>{{ number_format($r->total_cost, 2) }}</td>
                     <td><span class="badge badge-{{ strtolower($r->status) }}">{{ $r->status }}</span></td>
@@ -54,7 +58,7 @@
                 </tr>
                 @endforeach
             @empty
-                <tr><td colspan="10" class="text-muted">No GE orders yet.</td></tr>
+                <tr><td colspan="16" class="text-muted">No GE orders yet.</td></tr>
             @endforelse
             </tbody>
         </table>
