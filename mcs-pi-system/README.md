@@ -1,7 +1,7 @@
 # MCS Purchasing and Inventory Tracking System
 
 Laravel 13 (locked version 13.30.1), PHP 8.3+, PostgreSQL, server-rendered Blade.
-Theme: icy blue and silver. Application root: `mcs-pi-system/`.
+Theme: Golden Green Glimmer (forest green, gold and slate). Application root: `mcs-pi-system/`.
 
 ## Current verification status
 
