@@ -14,7 +14,7 @@ class ReportController extends Controller
 
     public function stockLevels()
     {
-        $rows = ItemBranch::with('item')
+        $rows = ItemBranch::with(['item', 'branch'])
             ->orderByRaw('(current_stock <= reorder_level) DESC')
             ->orderBy('item_id')
             ->get();
@@ -23,7 +23,7 @@ class ReportController extends Controller
 
     public function reorder()
     {
-        $rows = ItemBranch::with('item')
+        $rows = ItemBranch::with(['item', 'branch'])
             ->whereColumn('current_stock', '<=', 'reorder_level')
             ->orderBy('current_stock')
             ->get();
@@ -32,13 +32,15 @@ class ReportController extends Controller
 
     public function purchases()
     {
-        $rows = Order::select(
-            'ge_number', 'inventory_flag', 'status', 'order_date', 'account_code',
+        // Group by a complete header and status so different branches/suppliers are not combined.
+        $rows = Order::with(['supplier', 'branch'])->select(
+            'ge_number', 'po_number', 'supplier_id', 'branch_id', 'inventory_flag',
+            'status', 'order_date', 'account_code',
             DB::raw('SUM(total_cost) as order_total'),
             DB::raw('COUNT(*) as line_count')
-        )->groupBy('ge_number', 'inventory_flag', 'status', 'order_date', 'account_code')
-         ->orderByDesc('order_date')
-         ->get();
+        )->groupBy('ge_number', 'po_number', 'supplier_id', 'branch_id',
+            'inventory_flag', 'status', 'order_date', 'account_code')
+         ->orderByDesc('order_date')->orderByDesc('ge_number')->get();
         return view('reports.purchases', compact('rows'));
     }
 
