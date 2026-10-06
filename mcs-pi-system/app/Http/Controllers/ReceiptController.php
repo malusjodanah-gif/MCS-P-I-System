@@ -23,10 +23,10 @@ class ReceiptController extends Controller
 
     public function create()
     {
-        $lines = Order::with('supplier')
+        $lines = Order::with('supplier')->withSum('receipts', 'quantity_received')
             ->whereIn('status', ['Approved', 'Ordered', 'Backorder', 'Received'])
             ->orderByDesc('ge_number')
-            ->get();
+            ->get()->filter(fn ($line) => (int) $line->receipts_sum_quantity_received < $line->quantity);
         return view('receipts.create', compact('lines'));
     }
 
@@ -36,16 +36,25 @@ class ReceiptController extends Controller
             'order_line_id' => 'required|exists:orders,order_line_id',
             'quantity_received' => 'required|integer|min:1',
             'received_by' => 'required|string|max:100',
+            'date_received' => 'nullable|date',
             'grn' => 'nullable|string|max:100',
         ]);
 
         $qtyRecv = (int) $data['quantity_received'];
 
         DB::transaction(function () use ($data, $qtyRecv) {
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['mcs-po-assignment']);
+            }
             // Serialize receipts of the same line before checking the remainder.
             $order = Order::whereKey($data['order_line_id'])->lockForUpdate()->firstOrFail();
             if (!in_array($order->status, ['Approved', 'Ordered', 'Backorder', 'Received'], true)) {
                 throw ValidationException::withMessages(['order_line_id' => 'Order must be Approved/Ordered before receipt.']);
+            }
+            $po = $order->po_number ?? $order->ge_number;
+            if (Order::where('po_number', $po)->where('supplier_id', '!=', $order->supplier_id)->exists()
+                || Receipt::where('po_number', $po)->where('supplier_id', '!=', $order->supplier_id)->exists()) {
+                throw ValidationException::withMessages(['order_line_id' => 'This PO Number belongs to another supplier.']);
             }
             $received = (int) $order->receipts()->sum('quantity_received');
             $remaining = $order->quantity - $received;
@@ -64,7 +73,7 @@ class ReceiptController extends Controller
                 'quantity_received' => $qtyRecv,
                 'uom' => $order->uom,
                 'received_by' => $data['received_by'],
-                'date_received' => now()->toDateString(),
+                'date_received' => $data['date_received'] ?? now()->toDateString(),
                 'grn' => $data['grn'] ?? null,
                 'account_code' => $order->account_code,
                 'order_line_id' => $order->order_line_id,

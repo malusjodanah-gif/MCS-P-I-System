@@ -1,7 +1,7 @@
 # MCS Purchasing and Inventory Tracking System
 
 Laravel 13 (locked version 13.30.1), PHP 8.3+, PostgreSQL, server-rendered Blade.
-Theme: icy blue and silver. Application root: `mcs-pi-system/`.
+Theme: Golden Green Glimmer (forest green, gold and slate). Application root: `mcs-pi-system/`.
 
 ## Current verification status
 
@@ -87,3 +87,9 @@ costing, manual statuses, cancellation, multi-line GE consistency and operationa
 
 See [CHANGELOG.md](CHANGELOG.md) for corrections and [docs/SPECIFICATION_REVIEW.md](docs/SPECIFICATION_REVIEW.md)
 for remaining work and the demonstration checklist.
+
+## Alpha follow-up deployment
+
+Use the grouped pull requests in order (#1 → #2 → #3 → #4 → #5). After deploying the complete code, back up the database, run `php artisan migrate --force`, `php artisan optimize:clear`, and `php artisan mcs:check-schema`. Do not reset or reseed an existing alpha database.
+
+See [alpha retest instructions](docs/ALPHA_RETEST.md) and [specification column mapping](docs/SPECIFICATION_COLUMNS.md). Custom PO Number is entered when setting an approved line to Ordered; leaving it blank retains the existing PO or defaults to GE Number. Date Received can be entered during receipt creation.

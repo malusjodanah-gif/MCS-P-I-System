@@ -1,3 +1,17 @@
+# Alpha follow-up — 6 October 2026
+
+- BUG01: forward stock_revision repair and read-only inventory schema check; existing database upgrade instructions without resetting data.
+- BUG02: readable stock, reorder, purchase and issue tables with specification headings and correct purchase grouping.
+- BUG03: persistent sign out at every viewport width; narrow form layout, keyboard table access and defined theme colours.
+- Explicit specification identifiers and missing transaction/asset columns; logical/storage column mapping in docs/SPECIFICATION_COLUMNS.md.
+- Supported Adjustment IN → issue → cancellation retest covering the alpha zero-stock precondition.
+- Enter Date Received when recording a receipt; select only lines with outstanding quantity.
+- Assign pre-allocated PO Number when setting Ordered; retain default GE Number, enforce one supplier per PO and protect already receipted PO identifiers.
+
+Merge order: PR #1 (original specification fixes), #2 (schema), #3 (reports), #4 (interface/columns), #5 (purchasing completion). Retarget each dependent PR to main once its predecessor is merged. The final branch includes the complete stack.
+
+Existing database and actual Edge/Opera/Lighthouse acceptance still require the steps in docs/ALPHA_RETEST.md. CI results are recorded in each PR.
+
 # Change history
 
 ## 2026-10-04 — Specification review and regression fixes
