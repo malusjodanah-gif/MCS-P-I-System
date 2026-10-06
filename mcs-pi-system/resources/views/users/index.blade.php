@@ -9,7 +9,7 @@
     <div class="table-wrap">
         <table class="data">
             <thead>
-                <tr><th>User ID</th><th>Name</th><th>Email</th><th>Branch</th><th>Role</th><th></th></tr>
+                <tr><th>User ID</th><th>User</th><th>Email</th><th>Branch ID</th><th>Role</th><th></th></tr>
             </thead>
             <tbody>
             @forelse($rows as $r)

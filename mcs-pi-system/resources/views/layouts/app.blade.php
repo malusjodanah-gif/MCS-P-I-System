@@ -9,6 +9,13 @@
 </head>
 <body>
 @php $u = auth()->user(); @endphp
+<div class="account-bar">
+    <span>{{ $u->name }} · {{ $u->role }}</span>
+    <form method="POST" action="{{ route('logout') }}">
+        @csrf
+        <button type="submit" class="btn btn-secondary">Sign out</button>
+    </form>
+</div>
 <div class="app-shell">
     <aside class="sidebar">
         <div class="sidebar-brand">
@@ -46,10 +53,7 @@
                 <strong>{{ $u->name }}</strong>
                 <span>{{ $u->role }} · Branch {{ $u->branch_id }}</span>
             </div>
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="btn btn-secondary btn-sm w-full">Sign out</button>
-            </form>
+
         </div>
     </aside>
 

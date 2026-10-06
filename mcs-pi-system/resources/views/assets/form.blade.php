@@ -13,7 +13,7 @@
             </div>
             @endif
             <div class="form-group">
-                <label>Name</label>
+                <label>Asset</label>
                 <input type="text" name="asset" value="{{ old('asset', $row->asset ?? '') }}" required>
             </div>
             <div class="form-group">
@@ -57,7 +57,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>Linked item ID</label>
+                <label>Item ID</label>
                 <select name="item_id">
                     <option value="">— optional —</option>
                     @foreach($items as $i)

@@ -13,7 +13,7 @@
             </div>
             @endif
             <div class="form-group">
-                <label>Branch name</label>
+                <label>Branch</label>
                 <input type="text" name="branch" value="{{ old('branch', $row->branch ?? 'School of MCS') }}" required>
             </div>
             <div class="form-group">
@@ -21,7 +21,7 @@
                 <input type="text" name="faculty" value="{{ old('faculty', $row->faculty ?? 'Faculty of Sciences') }}" required>
             </div>
             <div class="form-group full">
-                <label>Head of School</label>
+                <label>HoS (Head of School)</label>
                 <input type="text" name="hos" value="{{ old('hos', $row->hos ?? '') }}">
             </div>
         </div>

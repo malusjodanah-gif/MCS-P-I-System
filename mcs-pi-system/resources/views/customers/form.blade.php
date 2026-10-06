@@ -13,11 +13,11 @@
             </div>
             @endif
             <div class="form-group">
-                <label>Name</label>
+                <label>Customer</label>
                 <input type="text" name="customer" value="{{ old('customer', $row->customer ?? '') }}" required>
             </div>
             <div class="form-group">
-                <label>Type</label>
+                <label>Customer Type</label>
                 <select name="customer_type">
                     @foreach(['STAFF','STUDENT','MCS'] as $t)
                         <option value="{{ $t }}" @selected(old('customer_type', $row->customer_type ?? 'STAFF')===$t)>{{ $t }}</option>

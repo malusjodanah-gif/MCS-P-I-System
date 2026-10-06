@@ -11,7 +11,7 @@
         <table class="data">
             <thead>
                 <tr>
-                    <th>Asset ID</th><th>Asset Name</th><th>Serial Number</th><th>Brand / Model</th><th>Cost</th>
+                    <th>Asset ID</th><th>Asset</th><th>Serial Number</th><th>Brand</th><th>Model</th><th>Date</th><th>Branch ID</th><th>Unit Cost</th>
                     <th>Location</th><th>Status</th><th>Item ID</th><th>PO Number</th>
                     @if(auth()->user()->canWriteInventory())<th>Action</th>@endif
                 </tr>
@@ -22,7 +22,9 @@
                     <td>{{ $r->asset_id }}</td>
                     <td>{{ $r->asset }}</td>
                     <td>{{ $r->serial_number ?? '—' }}</td>
-                    <td>{{ trim(($r->brand ?? '').' '.($r->model ?? '')) ?: '—' }}</td>
+                    <td>{{ $r->brand ?? '—' }}</td><td>{{ $r->model ?? '—' }}</td>
+                    <td>{{ $r->purchase_date?->format('Y-m-d') ?? '—' }}</td>
+                    <td>{{ $r->branch_id }}</td>
                     <td>{{ $r->unit_cost !== null ? number_format($r->unit_cost, 2) : '—' }}</td>
                     <td>{{ $r->location ?? '—' }}</td>
                     <td><span class="badge badge-stock">{{ $r->status }}</span></td>
@@ -39,7 +41,7 @@
                     @endif
                 </tr>
             @empty
-                <tr><td colspan="10" class="text-muted">No assets registered.</td></tr>
+                <tr><td colspan="13" class="text-muted">No assets registered.</td></tr>
             @endforelse
             </tbody>
         </table>

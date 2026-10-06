@@ -8,7 +8,7 @@
     <div class="table-wrap">
         <table class="data">
             <thead>
-                <tr><th>Branch ID</th><th>Branch Name</th><th>Faculty</th><th>Head of School</th><th>Action</th></tr>
+                <tr><th>Branch ID</th><th>Branch</th><th>Faculty</th><th>HoS</th><th>Action</th></tr>
             </thead>
             <tbody>
             @forelse($rows as $r)

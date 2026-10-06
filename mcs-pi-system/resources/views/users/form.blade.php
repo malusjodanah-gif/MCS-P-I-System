@@ -18,7 +18,7 @@
             </div>
             @endif
             <div class="form-group">
-                <label>Name</label>
+                <label>User</label>
                 <input type="text" name="name" value="{{ old('name', $row->name ?? '') }}" required>
             </div>
             <div class="form-group">
@@ -26,7 +26,7 @@
                 <input type="email" name="email" value="{{ old('email', $row->email ?? '') }}">
             </div>
             <div class="form-group">
-                <label>Branch</label>
+                <label>Branch ID</label>
                 <select name="branch_id" required>
                     @foreach($branches as $b)
                         <option value="{{ $b->branch_id }}" @selected(old('branch_id', $row->branch_id ?? 201)==$b->branch_id)>{{ $b->branch_id }} — {{ $b->branch }}</option>

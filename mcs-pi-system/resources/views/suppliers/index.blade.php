@@ -11,7 +11,7 @@
         <table class="data">
             <thead>
                 <tr>
-                    <th>Supplier ID</th><th>Supplier Name</th><th>Contact</th><th>Payment Term</th><th>Currency</th><th>Address</th>
+                    <th>Supplier ID</th><th>Supplier</th><th>Contact</th><th>Payment Term</th><th>Currency</th><th>Address</th>
                     @if(auth()->user()->canWritePurchasing())<th>Action</th>@endif
                 </tr>
             </thead>
