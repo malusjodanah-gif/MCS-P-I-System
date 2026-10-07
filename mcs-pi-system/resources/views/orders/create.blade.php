@@ -67,6 +67,9 @@
         </div>
     </form>
 </div>
+<style>
+#stock-item-group[hidden], #stock-uom-group[hidden] { display: none; }
+</style>
 <script>
 (() => {
     const flag = document.getElementById('inventory-flag');
