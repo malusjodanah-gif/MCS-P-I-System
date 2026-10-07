@@ -35,10 +35,13 @@ The repository PDF retains the same governing business rules as the v4 report co
 - Pending GE line editing and Issue/Adjustment editing are now implemented. Inventory edits
   reconcile old and new quantities in one transaction; forms select the relevant branch.
 - Receipt editing and cancellation are implemented. New STOCK receipts retain quantity/cost
-  snapshots and an inventory revision. Reversal restores the exact pre-receipt valuation and is
-  rejected after later stock/cost changes. Metadata can still be corrected. NON-STOCK receipts
+  snapshots and are rejected after later receipt, issue or adjustment activity, or if the current
+  stock/cost differs from the recorded post-receipt state. Metadata can still be corrected. NON-STOCK receipts
   can be edited/reversed without affecting inventory. Completed orders must be manually moved
   to Received before quantity correction; GE statuses never change automatically.
+- `stock_revision` is not defined by Specification v4 and has been removed from the live schema.
+  A forward migration preserves stock/cost data and replaces the revision token with before/after
+  valuation snapshots for guarded receipt reversals.
 - Legacy STOCK receipts lack valuation snapshots and cannot be reversed safely by this change.
   Receipts affected by later movements require a reviewed correction/adjustment workflow.
   Arbitrary retroactive valuation replay is not implemented.

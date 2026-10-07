@@ -14,6 +14,10 @@ Existing database and actual Edge/Opera/Lighthouse acceptance still require the 
 
 # Change history
 
+## 2026-10-07 — Remove non-specification revision field
+
+- Remove `stock_revision` and its receipt reference with a forward migration; preserve receipt reversal safeguards using valuation snapshots and later-movement checks.
+
 ## 2026-10-04 — Specification review and regression fixes
 
 - Repair fresh user/branch migration ordering and add missing string-ID database sessions.

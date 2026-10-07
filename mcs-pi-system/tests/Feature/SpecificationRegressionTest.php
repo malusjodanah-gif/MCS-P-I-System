@@ -2,11 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\Adjustment;
 use App\Models\Branch;
 use App\Models\ItemBranch;
 use App\Models\Order;
-use App\Models\Receipt;
 use App\Models\User;
 use App\Support\IdGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -406,6 +404,21 @@ class SpecificationRegressionTest extends TestCase
         $this->assertSame($before, $this->stock()->current_stock);
     }
 
+    public function test_receipt_reversal_is_blocked_after_later_movements_even_if_balance_is_restored(): void
+    {
+        $order = $this->order();
+        $this->receipt($order, 4)->assertSessionHasNoErrors();
+        $receipt = $order->receipts()->firstOrFail();
+        $this->post('/issues', ['item_id' => 1001, 'quantity' => 1, 'customer_id' => 4001])
+            ->assertSessionHasNoErrors();
+        $this->post('/adjustments', ['item_id' => 1001, 'quantity' => 1, 'adjustment_type' => 'IN'])
+            ->assertSessionHasNoErrors();
+        $before = $this->stock()->current_stock;
+        $this->delete(route('receipts.destroy', $receipt))->assertSessionHasErrors('quantity_received');
+        $this->assertSame($before, $this->stock()->current_stock);
+        $this->assertDatabaseHas('receipts', ['receipt_id' => $receipt->getKey()]);
+    }
+
     public function test_nonstock_receipt_can_be_edited_and_cancelled_without_stock_changes(): void
     {
         $order = $this->order('NON-STOCK', 3);
@@ -426,7 +439,7 @@ class SpecificationRegressionTest extends TestCase
         $order = $this->order();
         $this->receipt($order, 1)->assertSessionHasNoErrors();
         $receipt = $order->receipts()->firstOrFail();
-        $receipt->forceFill(['stock_before' => null, 'stock_revision_after' => null])->save();
+        $receipt->forceFill(['stock_before' => null, 'stock_after' => null, 'cost_after' => null])->save();
         $before = $this->stock()->current_stock;
         $this->delete(route('receipts.destroy', $receipt))->assertSessionHasErrors('quantity_received');
         $this->assertSame($before, $this->stock()->current_stock);

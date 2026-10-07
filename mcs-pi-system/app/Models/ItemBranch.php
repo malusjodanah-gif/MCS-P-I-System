@@ -7,18 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 class ItemBranch extends Model
 {
     protected $table = 'item_branches';
-    public $incrementing = false;
-    protected $primaryKey = 'item_id';
-    protected $keyType = 'int';
 
-    protected static function booted(): void
-    {
-        static::saving(function (ItemBranch $row) {
-            if ($row->exists && $row->isDirty(['current_stock', 'unit_cost'])) {
-                $row->stock_revision = ((int) $row->getRawOriginal('stock_revision')) + 1;
-            }
-        });
-    }
+    public $incrementing = false;
+
+    protected $primaryKey = 'item_id';
+
+    protected $keyType = 'int';
 
     // Eloquent assumes one primary key. Scope every write by both columns.
     protected function setKeysForSaveQuery($query)

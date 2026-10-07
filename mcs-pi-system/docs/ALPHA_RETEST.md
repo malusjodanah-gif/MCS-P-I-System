@@ -4,7 +4,7 @@ Sources: v4 MCS P&I System Specification (18 August 2026) and CS321 Alpha User T
 
 ## BUG01: deployment schema
 
-The application writes `item_branches.stock_revision` to protect receipt reversals. The alpha database lacked this column. The existing snapshot migration creates it; a forward repair migration also handles databases where the migration is recorded but the column is missing. No stock quantities, costs or transaction records are reset.
+`stock_revision` is not a Specification v4 field and is removed by a forward migration. Receipt reversals remain guarded by valuation snapshots and subsequent movement checks. Migration preserves stock quantities, costs and transaction records.
 
 After backing up the existing database, deploy the branches in their PR order and run:
 

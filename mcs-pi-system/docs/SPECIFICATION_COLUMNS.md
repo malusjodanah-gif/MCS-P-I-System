@@ -14,6 +14,6 @@ The visible table/form headings now use the specification's terms. Storage uses 
 | UnitCost / Unit Cost | unit_cost | Unit Cost |
 | HoS | hos | HoS (Head of School) on entry; HoS in the list |
 
-GE Orders show Item ID explicitly; NON-STOCK lines legitimately have no Item ID. Additional order_line_id and receipt_id keys support multiple items and partial receipts, which the business rules require. stock_revision and receipt snapshots are internal transaction safeguards, not user-maintained fields.
+GE Orders show Item ID explicitly; NON-STOCK lines legitimately have no Item ID. Additional order_line_id and receipt_id keys support multiple items and partial receipts, which the business rules require. `stock_revision` is not in Specification v4 and is not part of the schema. Receipt valuation snapshots (`stock_before`, `cost_before`, `purchase_unit_cost`, `stock_after`, and `cost_after`) are internal safeguards, not user-maintained fields.
 
 The report evidence confirms a missing internal column, rather than a need to rename the stock quantity field. Deploy the schema branch and run the preflight described in ALPHA_RETEST.md.
