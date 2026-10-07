@@ -57,13 +57,14 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>Item ID</label>
-                <select name="item_id">
-                    <option value="">— optional —</option>
+                <label>Item ID (ASSET item)</label>
+                <select name="item_id" required>
+                    <option value="">— select an item —</option>
                     @foreach($items as $i)
                         <option value="{{ $i->item_id }}" @selected(old('item_id', $row->item_id ?? '')==$i->item_id)>{{ $i->item_id }} — {{ $i->item }}</option>
                     @endforeach
                 </select>
+                <small>Select an ASSET item that has an Item Branch record for this branch.</small>
             </div>
             <div class="form-group">
                 <label>PO number</label>

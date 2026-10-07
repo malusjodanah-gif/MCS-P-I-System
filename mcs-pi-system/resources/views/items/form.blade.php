@@ -5,6 +5,9 @@
     <form method="POST" action="{{ $row ? route('items.update', $row) : route('items.store') }}">
         @csrf
         @if($row) @method('PUT') @endif
+        @unless($row)
+        <p class="text-muted">Create the item record here. Add branch-specific stock details separately in <a href="{{ route('itembranch.create') }}">Item Branch</a>.</p>
+        @endunless
         <div class="form-grid">
             @if(!$row)
             <div class="form-group">
@@ -44,30 +47,6 @@
                     @endforeach
                 </select>
             </div>
-            @if(!$row)
-            <div class="form-group">
-                <label>Current Stock</label>
-                <input type="number" value="0" disabled>
-                <small>Record stock through Receipts or Adjustments after creating the item.</small>
-            </div>
-            <div class="form-group">
-                <label>Unit Cost</label>
-                <input type="number" name="unit_cost" value="{{ old('unit_cost', 0) }}" min="0" step="0.01">
-            </div>
-            <div class="form-group">
-                <label>Location</label>
-                <input type="text" name="location" value="{{ old('location', 'Store Room A') }}">
-            </div>
-            <div class="form-group">
-                <label>Reorder Level</label>
-                <input type="number" name="reorder_level" value="{{ old('reorder_level', 5) }}" min="0">
-            </div>
-            <div class="form-group">
-                <label>Reorder Quantity</label>
-                <input type="number" name="reorder_quantity" value="{{ old('reorder_quantity', 10) }}" min="0">
-            </div>
-            <input type="hidden" name="create_stock" value="1">
-            @endif
         </div>
         <div class="mt-2 btn-group">
             <button type="submit" class="btn btn-primary">Save</button>

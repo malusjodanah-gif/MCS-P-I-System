@@ -32,7 +32,7 @@
         <a class="nav-item {{ request()->routeIs('receipts.*') ? 'active' : '' }}" href="{{ route('receipts.index') }}">Purchase Receipts</a>
 
         <div class="nav-section">Inventory</div>
-        <a class="nav-item {{ request()->routeIs('items.*') ? 'active' : '' }}" href="{{ route('items.index') }}">Stock Items</a>
+        <a class="nav-item {{ request()->routeIs('items.*') ? 'active' : '' }}" href="{{ route('items.index') }}">Items</a>
         <a class="nav-item {{ request()->routeIs('itembranch.*') ? 'active' : '' }}" href="{{ route('itembranch.index') }}">Item Branch</a>
         <a class="nav-item {{ request()->routeIs('issues.*') ? 'active' : '' }}" href="{{ route('issues.index') }}">Issue</a>
         <a class="nav-item {{ request()->routeIs('adjustments.*') ? 'active' : '' }}" href="{{ route('adjustments.index') }}">Stock Adjustments</a>

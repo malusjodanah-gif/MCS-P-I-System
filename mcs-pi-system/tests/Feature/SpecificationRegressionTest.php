@@ -55,6 +55,41 @@ class SpecificationRegressionTest extends TestCase
         $this->assertSame(15, $this->stock(1006)->current_stock);
     }
 
+    public function test_items_screen_and_form_only_manage_item_attributes(): void
+    {
+        $this->actingAs(User::findOrFail('admin'))
+            ->get('/items')
+            ->assertOk()
+            ->assertSee('Items')
+            ->assertDontSee('Stock Items');
+
+        $this->get('/items/create')
+            ->assertOk()
+            ->assertSee('Item Branch')
+            ->assertDontSee('Current Stock')
+            ->assertDontSee('Reorder Level')
+            ->assertDontSee('Reorder Quantity')
+            ->assertDontSee('name="unit_cost"', false)
+            ->assertDontSee('name="location"', false);
+
+        $this->post('/items', [
+            'item_id' => 1998,
+            'item' => 'Test asset',
+            'uom' => 'Each',
+            'category' => 'ASSET',
+            'sub_category' => 'Computer',
+            'supplier_id' => 5002,
+            'branch_id' => 201,
+            'unit_cost' => 25,
+            'location' => 'Test shelf',
+            'reorder_level' => 5,
+            'reorder_quantity' => 10,
+        ])->assertRedirect(route('items.index'))->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('items', ['item_id' => 1998, 'item' => 'Test asset', 'supplier_id' => 5002]);
+        $this->assertDatabaseMissing('item_branches', ['item_id' => 1998]);
+    }
+
     public function test_composite_key_save_refresh_and_delete_are_scoped_to_one_branch(): void
     {
         Branch::create(['branch_id' => 202, 'branch' => 'Other', 'faculty' => 'Sciences']);
@@ -264,7 +299,11 @@ class SpecificationRegressionTest extends TestCase
     public function test_assets_require_asset_items_stocked_at_the_selected_branch(): void
     {
         $payload = ['asset_id' => 3998, 'asset' => 'Test', 'branch_id' => 201, 'status' => 'new'];
-        $this->actingAs(User::findOrFail('io1'))->post('/assets', $payload)->assertSessionHasErrors('item_id');
+        $this->actingAs(User::findOrFail('io1'))
+            ->get('/assets/create')->assertOk()
+            ->assertSee('name="item_id" required', false)
+            ->assertDontSee('optional');
+        $this->post('/assets', $payload)->assertSessionHasErrors('item_id');
         $this->post('/assets', $payload + ['item_id' => 1001])->assertSessionHasErrors('item_id');
         Branch::create(['branch_id' => 202, 'branch' => 'Other', 'faculty' => 'Sciences']);
         $this->post('/assets', array_replace($payload, ['branch_id' => 202, 'item_id' => 1003]))->assertSessionHasErrors('item_id');

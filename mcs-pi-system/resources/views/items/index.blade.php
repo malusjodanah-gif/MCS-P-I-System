@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Stock Items')
+@section('title', 'Items')
 @section('actions')
 @if(auth()->user()->canWriteInventory())
 <a href="{{ route('items.create') }}" class="btn btn-primary">Add Item</a>

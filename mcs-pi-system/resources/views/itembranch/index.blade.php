@@ -38,7 +38,7 @@
                     @endif
                 </tr>
             @empty
-                <tr><td colspan="9" class="text-muted">No Item Branch records. Add Items with stock or create Item Branch rows.</td></tr>
+                <tr><td colspan="9" class="text-muted">No Item Branch records. Add an Item Branch record for each item and branch that needs stock tracking.</td></tr>
             @endforelse
             </tbody>
         </table>
