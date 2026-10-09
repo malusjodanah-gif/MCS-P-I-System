@@ -12,7 +12,7 @@ The following outcomes were reported by the user during guided local retesting, 
 
 Confirmed final Alpha Test Pens balance: 16 units at Unit Cost 5.6250, Stock Value 90.00.
 
-## Remaining form retest on fix/purchasing-orders
+## Form retest on fix/purchasing-orders — user confirmed passed
 
 1. Log in as Purchasing Officer; open New GE Order.
 2. STOCK: item selector is visible and required. Select Alpha Test Pens; description and UOM populate and cannot be manually changed.
@@ -24,3 +24,6 @@ Confirmed final Alpha Test Pens balance: 16 units at Unit Cost 5.6250, Stock Val
 8. Delete the disposable Pending orders.
 
 Future acceptance still includes repeated clean Lighthouse measurements and concurrent multi-user execution. Passing these guided checks is not a claim that every possible system scenario has been tested.
+
+
+The user confirmed all STOCK/NON-STOCK form checks passed on 7 October 2026. The additional layout, bulk GE entry, receipt guidance and search requirements were requested on 9 October and require a new retest.
