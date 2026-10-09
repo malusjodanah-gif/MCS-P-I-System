@@ -1,103 +1,37 @@
 @extends('layouts.app')
-@php
-    $row = $row ?? null;
-    $flag = $row ? $row->inventory_flag : old('inventory_flag', 'STOCK');
-    $isStock = $flag === 'STOCK';
-@endphp
-@section('title', $row ? 'Edit GE Line' : 'New GE Order')
+@section('title', 'New GE Order')
 @section('content')
-<div class="card" style="max-width:720px">
-    <form method="POST" action="{{ $row ? route('orders.update', $row) : route('orders.store') }}">
+@php
+    $draftLines = old('lines', []);
+    $count = min(100, max(10, (int) ceil(count($draftLines) / 10) * 10));
+@endphp
+<div class="card" style="max-width:800px">
+    <form id="ge-order-form" method="POST" action="{{ route('orders.store') }}">
         @csrf
-        @if($row) @method('PUT') @endif
+        <h3>Order header</h3>
+        <p class="text-muted mb-1">All lines share this branch, supplier, date, account code and inventory flag.</p>
         <div class="form-grid">
-            <div class="form-group">
-                <label>GE Number</label>
-                <input type="number" name="ge_number" @disabled($row) value="{{ old('ge_number', $nextGe) }}">
-            </div>
-            <div class="form-group">
-                <label>Inventory Flag</label>
-                <select id="inventory-flag" name="inventory_flag" @disabled($row)>
-                    <option value="STOCK" @selected($flag==='STOCK')>STOCK</option>
-                    <option value="NON-STOCK" @selected(old('inventory_flag', $row->inventory_flag ?? 'STOCK')==='NON-STOCK')>NON-STOCK</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Supplier</label>
-                <select name="supplier_id" @disabled($row) required>
-                    @foreach($suppliers as $s)
-                        <option value="{{ $s->supplier_id }}" @selected(old('supplier_id', $row->supplier_id ?? null)==$s->supplier_id)>{{ $s->supplier_id }} – {{ $s->supplier }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Account Code</label>
-                <input type="text" name="account_code" @disabled($row) value="{{ old('account_code', $row->account_code ?? '') }}">
-            </div>
-            <div class="form-group" id="stock-item-group" @if(!$isStock) hidden @endif>
-                <label for="stock-item">Item ID (STOCK)</label>
-                <select id="stock-item" name="item_id" @required($isStock) @disabled(!$isStock)>
-                    <option value="">— select for STOCK —</option>
-                    @foreach($items as $i)
-                        <option value="{{ $i->item_id }}" data-description="{{ $i->item }}" data-uom="{{ $i->uom }}" @selected(old('item_id', $row->item_id ?? null)==$i->item_id)>{{ $i->item_id }} – {{ $i->item }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="line-description">Item (description / particulars)</label>
-                <input id="line-description" type="text" name="item" value="{{ old('item', $row->item ?? '') }}" @readonly($isStock) @required(!$isStock)>
-                <small id="item-help">{{ $isStock ? 'Description and UOM come from the selected stock item.' : 'Enter the service or one-off purchase description. No stock item is linked.' }}</small>
-            </div>
-            <div class="form-group" id="stock-uom-group" @if(!$isStock) hidden @endif>
-                <label for="stock-uom">UOM</label>
-                <input id="stock-uom" type="text" value="{{ $row->uom ?? '' }}" disabled>
-            </div>
-            <div class="form-group">
-                <label>Quantity</label>
-                <input type="number" name="quantity" min="1" value="{{ old('quantity', $row->quantity ?? 1) }}" required>
-            </div>
-            <div class="form-group">
-                <label>Unit Cost (PGK)</label>
-                <input type="number" name="unit_cost" min="0" step="0.01" value="{{ old('unit_cost', $row->unit_cost ?? 0) }}" required>
-            </div>
+            <div class="form-group"><label for="ge-number">GE Number</label><input id="ge-number" type="number" name="ge_number" min="1" max="2147483647" value="{{ old('ge_number', $nextGe) }}"></div>
+            <div class="form-group"><label for="ge-branch">Branch</label><select id="ge-branch" name="branch_id" required>@foreach($branches as $branch)<option value="{{ $branch->branch_id }}" @selected(old('branch_id', auth()->user()->branch_id ?? 201)==$branch->branch_id)>{{ $branch->branch_id }} — {{ $branch->branch }}</option>@endforeach</select></div>
+            <div class="form-group"><label for="ge-supplier">Supplier</label><select id="ge-supplier" name="supplier_id" required>@foreach($suppliers as $supplier)<option value="{{ $supplier->supplier_id }}" data-currency="{{ $supplier->currency }}" @selected(old('supplier_id')==$supplier->supplier_id)>{{ $supplier->supplier_id }} — {{ $supplier->supplier }}</option>@endforeach</select></div>
+            <div class="form-group"><label for="ge-date">Date</label><input id="ge-date" type="date" name="order_date" value="{{ old('order_date', now()->toDateString()) }}" required></div>
+            <div class="form-group"><label for="inventory-flag">Inventory Flag</label><select id="inventory-flag" name="inventory_flag"><option value="STOCK" @selected(old('inventory_flag', 'STOCK')==='STOCK')>STOCK</option><option value="NON-STOCK" @selected(old('inventory_flag')==='NON-STOCK')>NON-STOCK</option></select></div>
+            <div class="form-group"><label for="ge-account">Account Code</label><input id="ge-account" name="account_code" maxlength="50" value="{{ old('account_code') }}"><small>The school’s budget or expenditure code for reporting.</small></div>
         </div>
-        <div class="mt-2 btn-group">
-            <button type="submit" class="btn btn-primary">{{ $row ? 'Save GE Line' : 'Create GE (Pending)' }}</button>
-            <a href="{{ route('orders.index') }}" class="btn btn-secondary">Cancel</a>
+        <h3 class="mt-2">Order lines</h3>
+        <p class="text-muted">Complete only the lines needed. Blank lines are ignored. Use “Clear line” to remove an entry.</p>
+        <div id="ge-lines">
+            @for($index = 0; $index < $count; $index++)
+                @include('orders.line', ['index' => $index, 'line' => $draftLines[$index] ?? []])
+            @endfor
         </div>
+        <button id="add-ge-lines" type="button" class="btn btn-secondary">+ Add 10 more lines</button>
+        <small id="ge-line-limit" class="text-muted" hidden>Maximum 100 lines per submission.</small>
+        <div class="order-total money" role="status" aria-live="polite">Order total: <output id="ge-grand-total">0.00</output></div>
+        <div class="btn-group mt-2"><button type="submit" class="btn btn-primary">Save entire GE (Pending)</button><a class="btn btn-secondary" href="{{ route('orders.index') }}">Cancel</a></div>
     </form>
 </div>
-<style>
-#stock-item-group[hidden], #stock-uom-group[hidden] { display: none; }
-</style>
-<script>
-(() => {
-    const flag = document.getElementById('inventory-flag');
-    const item = document.getElementById('stock-item');
-    const description = document.getElementById('line-description');
-    const uom = document.getElementById('stock-uom');
-    let serviceDescription = flag.value === 'NON-STOCK' ? description.value : '';
-    let previousStock = flag.value === 'STOCK';
-    function sync() {
-        const stock = flag.value === 'STOCK';
-        if (!previousStock) serviceDescription = description.value;
-        document.getElementById('stock-item-group').hidden = !stock;
-        document.getElementById('stock-uom-group').hidden = !stock;
-        item.disabled = !stock;
-        item.required = stock;
-        description.readOnly = stock;
-        description.required = !stock;
-        const selected = item.selectedOptions[0];
-        description.value = stock ? (selected?.dataset.description || '') : serviceDescription;
-        uom.value = stock ? (selected?.dataset.uom || '') : '';
-        document.getElementById('item-help').textContent = stock
-            ? 'Description and UOM come from the selected stock item.'
-            : 'Enter the service or one-off purchase description. No stock item is linked.';
-        previousStock = stock;
-    }
-    flag.addEventListener('change', sync);
-    item.addEventListener('change', sync);
-    sync();
-})();
-</script>
+<template id="ge-line-template">@include('orders.line', ['index' => '__INDEX__', 'line' => []])</template>
+<style>.ge-line [hidden] { display: none; }</style>
+<script src="{{ asset('js/ge-order.js') }}" defer></script>
 @endsection
