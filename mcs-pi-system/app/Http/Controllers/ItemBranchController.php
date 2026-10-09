@@ -11,10 +11,33 @@ use Illuminate\Validation\ValidationException;
 
 class ItemBranchController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $rows = ItemBranch::with(['item', 'branch'])->orderBy('item_id')->orderBy('branch_id')->get();
-        return view('itembranch.index', compact('rows'));
+        $filters = $request->validate([
+            'q' => 'nullable|string|max:100',
+            'branch_id' => 'nullable|integer|exists:branches,branch_id',
+            'category' => 'nullable|in:ASSET,CONSUMABLE',
+            'stock' => 'nullable|in:low,positive,zero',
+        ]);
+        $query = ItemBranch::with(['item', 'branch']);
+        if (isset($filters['q']) && trim($filters['q']) !== '') {
+            $text = mb_strtolower(trim($filters['q']));
+            $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $text).'%';
+            $query->where(function ($query) use ($pattern) {
+                $query->whereRaw("LOWER(location) LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("CAST(item_id AS TEXT) LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereHas('item', fn ($item) => $item->whereRaw("LOWER(item) LIKE ? ESCAPE '!'", [$pattern]))
+                    ->orWhereHas('branch', fn ($branch) => $branch->whereRaw("LOWER(branch) LIKE ? ESCAPE '!'", [$pattern]));
+            });
+        }
+        if (!empty($filters['branch_id'])) $query->where('branch_id', $filters['branch_id']);
+        if (!empty($filters['category'])) $query->whereHas('item', fn ($item) => $item->where('category', $filters['category']));
+        if (($filters['stock'] ?? '') === 'low') $query->whereColumn('current_stock', '<=', 'reorder_level');
+        if (($filters['stock'] ?? '') === 'positive') $query->where('current_stock', '>', 0);
+        if (($filters['stock'] ?? '') === 'zero') $query->where('current_stock', 0);
+        $rows = $query->orderBy('item_id')->orderBy('branch_id')->get();
+        $branches = Branch::orderBy('branch_id')->get();
+        return view('itembranch.index', compact('rows', 'branches', 'filters'));
     }
 
     public function create()
@@ -87,3 +110,4 @@ class ItemBranchController extends Controller
         return redirect()->route('itembranch.index')->with('success', 'Stock record deleted.');
     }
 }
+

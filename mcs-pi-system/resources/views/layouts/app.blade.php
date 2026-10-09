@@ -77,5 +77,7 @@
         </main>
     </div>
 </div>
+<script src="{{ asset('js/table-browser.js') }}" defer></script>
 </body>
 </html>
+
