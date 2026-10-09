@@ -6,14 +6,15 @@
         @csrf
         <div class="form-group">
             <label>Order Line (Approved / Ordered / Received / Backorder)</label>
-            <select name="order_line_id" required>
+            <select id="receipt-order-line" name="order_line_id" required>
                 @foreach($lines as $o)
-                    <option value="{{ $o->order_line_id }}">GE {{ $o->ge_number }} · {{ $o->item }} · PO {{ $o->po_number ?? $o->ge_number }} · Branch {{ $o->branch_id }} · Item ID {{ $o->item_id ?? 'NON-STOCK' }} · Remaining {{ $o->quantity - (int) $o->receipts_sum_quantity_received }} {{ $o->uom }} · {{ $o->status }}</option>
+                    <option value="{{ $o->order_line_id }}" data-ordered="{{ $o->quantity }}" data-received="{{ (int) $o->receipts_sum_quantity_received }}" data-uom="{{ $o->uom }}" @selected(old('order_line_id')==$o->order_line_id)>GE {{ $o->ge_number }} · {{ $o->item }} · PO {{ $o->po_number ?? $o->ge_number }} · Branch {{ $o->branch_id }} · Item ID {{ $o->item_id ?? 'NON-STOCK' }} · Remaining {{ $o->quantity - (int) $o->receipts_sum_quantity_received }} {{ $o->uom }} · {{ $o->status }}</option>
                 @endforeach
             </select>
         </div>
+        <p id="receipt-quantity-note" class="alert alert-info mt-1" role="status" aria-live="polite">Select an order line to see the quantity ordered, already received and outstanding.</p>
         <div class="form-grid mt-1">
-            <div class="form-group"><label>Quantity Received</label><input type="number" name="quantity_received" min="1" value="{{ old('quantity_received', 1) }}" required></div>
+            <div class="form-group"><label>Quantity Received</label><input id="receipt-quantity" aria-describedby="receipt-quantity-note" type="number" step="1" name="quantity_received" min="1" value="{{ old('quantity_received', 1) }}" required></div>
             <div class="form-group"><label>Date Received</label><input type="date" name="date_received" value="{{ old('date_received', now()->toDateString()) }}" required></div>
             <div class="form-group"><label>Received By</label><input type="text" name="received_by" value="{{ auth()->user()->name }}" required></div>
             <div class="form-group"><label>GRN / Invoice #</label><input type="text" name="grn"></div>
@@ -26,4 +27,6 @@
         </div>
     </form>
 </div>
+<script src="{{ asset('js/receipt-guidance.js') }}" defer></script>
 @endsection
+
