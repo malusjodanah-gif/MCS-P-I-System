@@ -12,13 +12,13 @@
             <thead>
                 <tr>
                     <th>GE Number</th><th>Inventory Flag</th><th>Supplier</th><th>Date</th><th>PO Number</th><th>Branch ID</th><th>Account Code</th><th>Item ID</th><th>Item</th>
-                    <th>Quantity</th><th>UOM</th><th>Unit Cost</th><th>Total Cost</th><th>Status</th><th>Action</th>
+                    <th>Quantity</th><th>UOM</th><th>Unit Cost</th><th>Total Cost</th><th>Status</th>@if(auth()->user()->canWritePurchasing())<th>Action</th>@endif
                 </tr>
             </thead>
             <tbody>
             @forelse($orders as $ge => $lines)
                 @foreach($lines as $idx => $r)
-                <tr>
+                <tr data-group="{{ $ge }}">
                     <td>@if($idx===0)<strong>{{ $r->ge_number }}</strong>@endif</td>
                     <td>@if($idx===0)<span class="badge {{ $r->inventory_flag === 'STOCK' ? 'badge-stock' : 'badge-non-stock' }}">{{ $r->inventory_flag }}</span>@endif</td>
                     <td>@if($idx===0){{ $r->supplier->supplier ?? $r->supplier_id }}@endif</td>
@@ -32,8 +32,8 @@
                     <td>{{ number_format($r->unit_cost, 2) }}</td>
                     <td>{{ number_format($r->total_cost, 2) }}</td>
                     <td><span class="badge badge-{{ strtolower($r->status) }}">{{ $r->status }}</span></td>
+                    @if(auth()->user()->canWritePurchasing())
                     <td>
-                        @if(auth()->user()->canWritePurchasing())
                         @if($r->status === 'Pending')
                         <a href="{{ route('orders.edit', $r) }}" class="btn btn-sm btn-secondary">Edit</a>
                         @endif
@@ -56,13 +56,13 @@
                             <button class="btn btn-sm btn-danger" type="submit">Del</button>
                         </form>
                         @endif
-                        @endif
                     </td>
+                    @endif
                 </tr>
                 @endforeach
-                <tr class="order-summary"><td colspan="12">GE {{ $ge }} — Order total</td><td class="money">{{ $lines->first()->supplier->currency ?? 'PGK' }} {{ number_format($lines->sum('total_cost'), 2) }}</td><td colspan="2"></td></tr>
+                <tr class="order-summary" data-group="{{ $ge }}"><td colspan="12">GE {{ $ge }} — Order total</td><td class="money">{{ $lines->first()->supplier->currency ?? 'PGK' }} {{ number_format($lines->sum('total_cost'), 2) }}</td><td colspan="{{ auth()->user()->canWritePurchasing() ? 2 : 1 }}"></td></tr>
             @empty
-                <tr><td colspan="15" class="text-muted">No GE orders yet.</td></tr>
+                <tr><td colspan="{{ auth()->user()->canWritePurchasing() ? 15 : 14 }}" class="text-muted">No GE orders yet.</td></tr>
             @endforelse
             </tbody>
         </table>

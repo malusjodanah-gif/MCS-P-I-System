@@ -39,10 +39,11 @@
                     @endif
                 </tr>
             @empty
-                <tr><td colspan="11" class="text-muted">No adjustments.</td></tr>
+                <tr><td colspan="{{ auth()->user()->canWriteInventory() ? 11 : 10 }}" class="text-muted">No adjustments.</td></tr>
             @endforelse
             </tbody>
         </table>
     </div>
 </div>
 @endsection
+

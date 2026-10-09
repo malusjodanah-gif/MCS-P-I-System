@@ -41,10 +41,11 @@
                     @endif
                 </tr>
             @empty
-                <tr><td colspan="13" class="text-muted">No assets registered.</td></tr>
+                <tr><td colspan="{{ auth()->user()->canWriteInventory() ? 13 : 12 }}" class="text-muted">No assets registered.</td></tr>
             @endforelse
             </tbody>
         </table>
     </div>
 </div>
 @endsection
+

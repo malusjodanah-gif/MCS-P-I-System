@@ -35,10 +35,11 @@
                     @endif
                 </tr>
             @empty
-                <tr><td colspan="7" class="text-muted">No suppliers.</td></tr>
+                <tr><td colspan="{{ auth()->user()->canWritePurchasing() ? 7 : 6 }}" class="text-muted">No suppliers.</td></tr>
             @endforelse
             </tbody>
         </table>
     </div>
 </div>
 @endsection
+
