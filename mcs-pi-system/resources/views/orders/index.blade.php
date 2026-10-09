@@ -60,6 +60,7 @@
                     </td>
                 </tr>
                 @endforeach
+                <tr class="order-summary"><td colspan="12">GE {{ $ge }} — Order total</td><td class="money">{{ $lines->first()->supplier->currency ?? 'PGK' }} {{ number_format($lines->sum('total_cost'), 2) }}</td><td colspan="2"></td></tr>
             @empty
                 <tr><td colspan="15" class="text-muted">No GE orders yet.</td></tr>
             @endforelse
@@ -68,3 +69,4 @@
     </div>
 </div>
 @endsection
+

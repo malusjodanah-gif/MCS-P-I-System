@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
 use App\Models\Item;
 use App\Models\Order;
 use App\Models\Supplier;
@@ -27,83 +28,94 @@ class OrderController extends Controller
         $suppliers = Supplier::orderBy('supplier')->get();
         $items = Item::orderBy('item')->get();
         $nextGe = (Order::max('ge_number') ?? 1000) + 1;
-        return view('orders.create', compact('suppliers', 'items', 'nextGe'));
+        $branches = Branch::orderBy('branch_id')->get();
+        return view('orders.create', compact('suppliers', 'items', 'nextGe', 'branches'));
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate([
+        $header = $request->validate([
             'ge_number' => 'nullable|integer|min:1|max:2147483647',
             'inventory_flag' => 'required|in:STOCK,NON-STOCK',
             'supplier_id' => 'required|exists:suppliers,supplier_id',
+            'branch_id' => 'nullable|integer|exists:branches,branch_id',
+            'order_date' => 'nullable|date',
             'account_code' => 'nullable|string|max:50',
-            'item_id' => 'nullable|exists:items,item_id',
-            'item' => 'nullable|string|max:255',
-            'quantity' => 'required|integer|min:1',
-            'unit_cost' => 'required|numeric|min:0',
         ]);
-
-        $requestedGe = $data['ge_number'] ?? null;
-        $desc = $data['item'] ?? null;
-        $uom = null;
-        $itemId = $data['item_id'] ?? null;
-
-        if ($data['inventory_flag'] === 'STOCK') {
-            if (!$itemId) {
-                return back()->withErrors(['item_id' => 'Item is required for STOCK orders'])->withInput();
-            }
-            $item = Item::findOrFail($itemId);
-            $desc = $item->item;
-            $uom = $item->uom;
-        } else {
-            $itemId = null;
-            if (!$desc) {
-                return back()->withErrors(['item' => 'Description required for NON-STOCK'])->withInput();
-            }
+        $bulk = $request->has('lines');
+        if ($bulk) {
+            $request->validate(['lines' => 'required|array|min:1|max:100', 'lines.*' => 'array']);
         }
-
-        $qty = (int) $data['quantity'];
-        $unit = (float) $data['unit_cost'];
-
-        $ge = DB::transaction(function () use ($requestedGe, $data, $itemId, $desc, $uom, $qty, $unit) {
+        $rawLines = $bulk ? $request->input('lines') : [$request->only('item_id', 'item', 'quantity', 'unit_cost')];
+        $prepared = [];
+        foreach ($rawLines as $index => $raw) {
+            $blank = collect(['item_id', 'item', 'quantity', 'unit_cost'])->every(
+                fn ($key) => !isset($raw[$key]) || (is_string($raw[$key]) && trim($raw[$key]) === '')
+            );
+            if ($bulk && $blank) {
+                continue;
+            }
+            $prefix = $bulk ? "lines.$index." : '';
+            $rules = [
+                $prefix.'item_id' => $header['inventory_flag'] === 'STOCK' ? 'required|integer|exists:items,item_id' : 'nullable',
+                $prefix.'item' => $header['inventory_flag'] === 'NON-STOCK' ? 'required|string|max:255' : 'nullable|string|max:255',
+                $prefix.'quantity' => 'required|integer|min:1|max:2147483647',
+                $prefix.'unit_cost' => 'required|numeric|min:0|max:99999999.9999',
+            ];
+            $validated = \Illuminate\Support\Facades\Validator::make($bulk ? ['lines' => [$index => $raw]] : $raw, $rules)->validate();
+            $line = $bulk ? $validated['lines'][$index] : $validated;
+            if ($header['inventory_flag'] === 'STOCK') {
+                $item = Item::findOrFail($line['item_id']);
+                $line['item'] = $item->item;
+                $line['uom'] = $item->uom;
+            } else {
+                $line['item_id'] = null;
+                $line['uom'] = null;
+            }
+            $line['unit_cost'] = round((float) $line['unit_cost'], 4);
+            $line['total_cost'] = round((int) $line['quantity'] * (float) $line['unit_cost'], 2);
+            if ($line['total_cost'] > 9999999999.99) {
+                throw ValidationException::withMessages([$prefix.'unit_cost' => 'The line total exceeds the supported amount.']);
+            }
+            $prepared[] = $line;
+        }
+        if (!$prepared) {
+            throw ValidationException::withMessages(['lines' => 'Enter at least one complete order line.']);
+        }
+        $branch = $header['branch_id'] ?? Auth::user()->branch_id ?? 201;
+        $ge = DB::transaction(function () use ($request, $header, $branch, $prepared) {
             if (DB::connection()->getDriverName() === 'pgsql') {
                 DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['mcs-ge-allocation']);
             }
-            $ge = $requestedGe ?? ((Order::max('ge_number') ?? 1000) + 1);
-            // Serialize concurrent additions to a pre-allocated GE on PostgreSQL.
+            $ge = $header['ge_number'] ?? ((Order::max('ge_number') ?? 1000) + 1);
             if (DB::connection()->getDriverName() === 'pgsql') {
                 DB::select('SELECT pg_advisory_xact_lock(?)', [(int) $ge]);
             }
-            $lines = Order::where('ge_number', $ge)->lockForUpdate()->get();
-            $header = $lines->first();
-            if ($header && ($lines->contains(fn ($line) => $line->status !== 'Pending')
-                || $header->supplier_id != $data['supplier_id']
-                || $header->inventory_flag !== $data['inventory_flag']
-                || $header->branch_id != Auth::user()->branch_id
-                || $header->account_code !== ($data['account_code'] ?? null))) {
-                throw ValidationException::withMessages(['ge_number' => 'Add lines only to a Pending GE with the same supplier, flag, branch and account code.']);
+            $existing = Order::where('ge_number', $ge)->lockForUpdate()->get();
+            $first = $existing->first();
+            if ($first && ($existing->contains(fn ($line) => $line->status !== 'Pending')
+                || $first->supplier_id != $header['supplier_id']
+                || $first->inventory_flag !== $header['inventory_flag']
+                || $first->branch_id != $branch
+                || $first->account_code !== ($header['account_code'] ?? null)
+                || ($request->filled('order_date') && $first->order_date->toDateString() !== \Illuminate\Support\Carbon::parse($header['order_date'])->toDateString()))) {
+                throw ValidationException::withMessages(['ge_number' => 'Add lines only to a Pending GE with the same supplier, flag, branch, date and account code.']);
             }
-            Order::create([
-                'ge_number' => $ge,
-                'inventory_flag' => $data['inventory_flag'],
-                'po_number' => null,
-                'supplier_id' => $data['supplier_id'],
-                'order_date' => $header ? $header->order_date : now()->toDateString(),
-                'user_id' => Auth::user()->user_id,
-                'branch_id' => Auth::user()->branch_id ?? 201,
-                'account_code' => $data['account_code'] ?? null,
-                'item_id' => $itemId,
-                'item' => $desc,
-                'uom' => $uom,
-                'quantity' => $qty,
-                'unit_cost' => $unit,
-                'total_cost' => round($qty * $unit, 2),
-                'status' => 'Pending',
-            ]);
+            $date = $first ? $first->order_date : ($header['order_date'] ?? now()->toDateString());
+            foreach ($prepared as $line) {
+                Order::create([
+                    'ge_number' => $ge, 'po_number' => null,
+                    'inventory_flag' => $header['inventory_flag'], 'supplier_id' => $header['supplier_id'],
+                    'branch_id' => $branch, 'order_date' => $date, 'user_id' => Auth::user()->user_id,
+                    'account_code' => $header['account_code'] ?? null,
+                    'item_id' => $line['item_id'], 'item' => $line['item'], 'uom' => $line['uom'],
+                    'quantity' => $line['quantity'], 'unit_cost' => $line['unit_cost'],
+                    'total_cost' => $line['total_cost'], 'status' => 'Pending',
+                ]);
+            }
             return $ge;
         }, 5);
-
-        return redirect()->route('orders.index')->with('success', "GE #{$ge} created (Pending). Status is updated manually by Purchasing.");
+        return redirect()->route('orders.index')->with('success', "GE #{$ge} saved (Pending). Status remains manual.");
     }
 
     public function edit(Order $order)
@@ -111,7 +123,7 @@ class OrderController extends Controller
         if ($order->status !== 'Pending' || $order->receipts()->exists()) {
             throw ValidationException::withMessages(['order' => 'Only unreceipted Pending lines can be edited.']);
         }
-        return view('orders.create', [
+        return view('orders.edit', [
             'row' => $order, 'nextGe' => $order->ge_number,
             'suppliers' => Supplier::orderBy('supplier')->get(),
             'items' => Item::orderBy('item')->get(),
@@ -233,3 +245,4 @@ class OrderController extends Controller
         return back()->with('success', 'Order line deleted.');
     }
 }
+
