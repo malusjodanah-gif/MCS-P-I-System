@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', $row ? 'Edit user' : 'Add user')
 @section('content')
-<div class="card" style="max-width:560px">
+<div class="card">
     <form method="POST" action="{{ $row ? route('users.update', $row) : route('users.store') }}">
         @csrf
         @if($row) @method('PUT') @endif

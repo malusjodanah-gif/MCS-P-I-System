@@ -6,7 +6,7 @@
 @endphp
 @section('title', $row ? 'Edit GE Line' : 'New GE Order')
 @section('content')
-<div class="card" style="max-width:720px">
+<div class="card">
     <form method="POST" action="{{ $row ? route('orders.update', $row) : route('orders.store') }}">
         @csrf
         @if($row) @method('PUT') @endif

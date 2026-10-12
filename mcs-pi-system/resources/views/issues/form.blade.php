@@ -2,7 +2,7 @@
 @php $row = $row ?? null; @endphp
 @section('title', $row ? 'Edit Issue' : 'Create Issue')
 @section('content')
-<div class="card" style="max-width:560px">
+<div class="card">
     <form method="POST" action="{{ $row ? route('issues.update', $row) : route('issues.store') }}">
         @csrf
         @if($row) @method('PUT') @endif
