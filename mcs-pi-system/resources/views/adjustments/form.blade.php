@@ -2,7 +2,7 @@
 @section('title', 'Stock adjustment')
 @php $row = $row ?? null; @endphp
 @section('content')
-<div class="card" style="max-width:560px">
+<div class="card">
     <form method="POST" action="{{ $row ? route('adjustments.update', $row) : route('adjustments.store') }}">
         @csrf
         @if($row) @method('PUT') @endif

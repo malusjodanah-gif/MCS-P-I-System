@@ -679,10 +679,19 @@ table.data caption { text-align: left; font-weight: 600; padding: 0.75rem; }
 :root { --font: "Aptos", "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
 body { font-variant-numeric: lining-nums tabular-nums; }
 input, select, textarea, button { font-family: var(--font); }
-.form-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
-@media (max-width: 768px) {
-  .form-grid { grid-template-columns: minmax(0, 1fr); }
+/* Each form section stays on one horizontal row, including narrow screens. */
+.content { min-width: 0; }
+.form-grid {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 1rem;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.25rem 0.25rem 0.75rem;
 }
+.form-grid > .form-group { flex: 0 0 200px; }
+.form-grid > [hidden] { display: none; }
 .form-group { min-width: 0; }
 .form-group input, .form-group select, .form-group textarea { width: 100%; }
 .money, .quantity, table.data { font-variant-numeric: lining-nums tabular-nums; }

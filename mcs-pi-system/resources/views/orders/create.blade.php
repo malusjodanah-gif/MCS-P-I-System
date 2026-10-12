@@ -5,7 +5,7 @@
     $draftLines = old('lines', []);
     $count = min(100, max(10, (int) ceil(count($draftLines) / 10) * 10));
 @endphp
-<div class="card" style="max-width:800px">
+<div class="card">
     <form id="ge-order-form" method="POST" action="{{ route('orders.store') }}">
         @csrf
         <h3>Order header</h3>

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', $row ? 'Edit Item Branch' : 'Add Item Branch')
 @section('content')
-<div class="card" style="max-width:640px">
+<div class="card">
     <form method="POST" action="{{ $row ? route('itembranch.update', [$row->item_id, $row->branch_id]) : route('itembranch.store') }}">
         @csrf
         @if($row) @method('PUT') @endif

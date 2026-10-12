@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Edit Receipt')
 @section('content')
-<div class="card" style="max-width:560px">
+<div class="card">
     <form method="POST" action="{{ route('receipts.update', $row) }}">
         @csrf @method('PUT')
         <p>PO / GE {{ $row->po_number }} · Receipt {{ $row->receipt_id }} · Ordered {{ $row->quantity_ordered }}</p>
