@@ -718,3 +718,18 @@ table.data tr[hidden] { display: none; }
   background-repeat: no-repeat, repeat;
   background-size: cover, 256px 256px;
 }
+
+/* Entry workspace: full width by default, navigation always recoverable. */
+.sidebar[hidden], #navigation-toggle[hidden], #form-font-controls[hidden] { display: none; }
+.workspace-heading, .workspace-tools { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.workspace-heading { min-width: 0; }
+.topbar { flex-wrap: wrap; gap: 0.75rem; }
+#form-font-controls { align-items: center; flex-wrap: wrap; }
+#form-font-size { min-width: 3rem; text-align: center; }
+.form-page .content { font-size: var(--entry-font-size, 14px); }
+.form-page .content :is(label, input, select, textarea, button, small, p, summary, output) {
+  font-size: var(--entry-font-size, 14px);
+}
+.form-page .content .form-grid > .form-group {
+  flex-basis: calc(var(--entry-font-size, 14px) * 14.285714);
+}
