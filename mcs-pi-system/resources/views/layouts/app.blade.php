@@ -64,7 +64,7 @@
     <div class="main">
         <header class="topbar">
             <div class="workspace-heading">
-                <button id="navigation-toggle" type="button" class="btn btn-secondary" aria-controls="app-navigation" aria-expanded="{{ $isFormPage ? 'false' : 'true' }}" hidden>Menu</button>
+                <button id="navigation-toggle" type="button" class="btn btn-secondary" aria-controls="app-navigation" aria-expanded="{{ $isFormPage ? 'false' : 'true' }}" hidden>{{ $isFormPage ? 'Show menu' : 'Hide menu' }}</button>
             <h2>@yield('title', 'Dashboard')</h2>
             </div>
             <div class="workspace-tools">

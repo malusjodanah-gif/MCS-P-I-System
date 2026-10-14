@@ -1,6 +1,6 @@
 # Form workspace
 
-Creation and edit pages start with the sidebar hidden to provide more room. Menu restores navigation; Escape closes it and returns focus to Menu. Without JavaScript, navigation remains visible.
+Creation and edit pages start with the sidebar hidden to provide more room. Show menu restores navigation and changes to Hide menu. Hide menu or Escape closes it and restores the Show menu label; Escape returns focus to that button. Without JavaScript, navigation remains visible.
 
 A− and A+ adjust form text between 12px and 20px. Reset size restores 14px. The preference stays in this browser where local storage is available. Smaller text also reduces field widths; fields remain on a single horizontal row with scrolling.
 

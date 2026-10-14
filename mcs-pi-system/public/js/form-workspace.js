@@ -7,6 +7,7 @@
         const setOpen = (open) => {
             navigation.hidden = !open;
             toggle.setAttribute('aria-expanded', String(open));
+            toggle.textContent = open ? 'Hide menu' : 'Show menu';
         };
         setOpen(!navigation.hidden);
         toggle.addEventListener('click', () => {
