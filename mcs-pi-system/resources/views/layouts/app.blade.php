@@ -7,8 +7,12 @@
     <title>@yield('title', 'MCS P&I') — Purchasing & Inventory</title>
     <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
 </head>
-<body>
-@php $u = auth()->user(); @endphp
+@php
+    $u = auth()->user();
+    $isFormPage = request()->routeIs('*.create', '*.edit');
+@endphp
+<body @class(['form-page' => $isFormPage])>
+<noscript><style>.sidebar[hidden] { display: flex !important; }</style></noscript>
 <div class="account-bar">
     <span>{{ $u->name }} · {{ $u->role }}</span>
     <form method="POST" action="{{ route('logout') }}">
@@ -17,7 +21,7 @@
     </form>
 </div>
 <div class="app-shell">
-    <aside class="sidebar">
+    <aside id="app-navigation" class="sidebar" aria-label="Main navigation" @if($isFormPage) hidden @endif>
         <div class="sidebar-brand">
             <h1>MCS P&amp;I System</h1>
             <small>Purchasing &amp; Inventory</small>
@@ -59,8 +63,21 @@
 
     <div class="main">
         <header class="topbar">
+            <div class="workspace-heading">
+                <button id="navigation-toggle" type="button" class="btn btn-secondary" aria-controls="app-navigation" aria-expanded="{{ $isFormPage ? 'false' : 'true' }}" hidden>Menu</button>
             <h2>@yield('title', 'Dashboard')</h2>
-            <div class="btn-group">@yield('actions')</div>
+            </div>
+            <div class="workspace-tools">
+                @if($isFormPage)
+                <div id="form-font-controls" class="btn-group" role="group" aria-label="Form text size" hidden>
+                    <button id="form-font-smaller" type="button" class="btn btn-secondary" aria-label="Decrease form text size">A−</button>
+                    <output id="form-font-size" role="status" aria-live="polite">14px</output>
+                    <button id="form-font-larger" type="button" class="btn btn-secondary" aria-label="Increase form text size">A+</button>
+                    <button id="form-font-reset" type="button" class="btn btn-secondary">Reset size</button>
+                </div>
+                @endif
+                <div class="btn-group">@yield('actions')</div>
+            </div>
         </header>
         <main class="content">
             @if(session('success'))
@@ -78,6 +95,7 @@
     </div>
 </div>
 <script src="{{ asset('js/table-browser.js') }}" defer></script>
+<script src="{{ asset('js/form-workspace.js') }}" defer></script>
 </body>
 </html>
 
